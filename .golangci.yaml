@@ -1,0 +1,29 @@
+version: "2"
+
+linters:
+  default: standard
+  enables:
+    - bodyclose
+    - errorlint
+    - misspell
+    - nilerr
+    - revive
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - wastedassign
+
+  settings:
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+        - name: package-comments
+          disabled: true
+
+  exclusions:
+    generated: lax
+
+formatters:
+  enable:
+    - gofmt
