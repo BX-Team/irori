@@ -1,0 +1,7 @@
+/irori
+/result
+/result-*
+.direnv/
+.irori/
+.irori.json
+.irori.lock.json
