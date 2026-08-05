@@ -10,7 +10,7 @@ The server process is owned by a **detached irori daemon**, not by the TUI and n
 
 | Package             | Responsibility                                                                                       |
 | ------------------- | ---------------------------------------------------------------------------------------------------- |
-| `internal/cli`      | cobra commands: TUI (default), `daemon`, `start`/`stop`/`restart`/`kill`/`status`/`cmd`/`logs`, `apply`, `nix`, `defaults`. |
+| `internal/cli`      | cobra commands: TUI (default), `daemon`, `start`/`stop`/`restart`/`kill`/`status`/`cmd`/`logs`, `apply`, `config`, `nix`, `defaults`. |
 | `internal/daemon`   | The supervisor: spawns java, scans console output, tracks state/players/stats, restarts, serves the socket. |
 | `internal/ipc`      | Wire protocol between daemon and clients (newline-delimited JSON frames over a unix socket).           |
 | `internal/config`   | `.irori.json`, `.irori.lock.json`, paths (socket, state dir, user config/cache), sealed mode.          |
@@ -18,6 +18,8 @@ The server process is owned by a **detached irori daemon**, not by the TUI and n
 | `internal/mcjars`   | mcjars.app client: cores, versions, builds, install recipes, the config files a build ships.           |
 | `internal/modrinth` | Modrinth search and downloads.                                                                        |
 | `internal/apply`    | `irori apply` — installs the declared core and plugins, prunes what is no longer declared.             |
+| `internal/install`  | The one path a jar reaches the directory by; always records what it installed in the lock.             |
+| `internal/confdiff` | Diffs the configs the core ships against the ones on disk, for `irori config import`.                 |
 | `internal/lock`     | `.irori.lock.json`: every URL and checksum irori installed.                                            |
 | `internal/nixgen`   | Renders the lock as fixed-output derivations for the NixOS module.                                     |
 | `internal/overrides`| Writes declared keys back into properties/yml/toml **preserving comments**. The single writer for config files. |
@@ -36,6 +38,8 @@ Tabs, in order: **Console** (dashboard), **Files**, **Plugins/Mods**, **Configs*
 - **Configs are edited two ways**: `$EDITOR` through `tea.ExecProcess`, and declaratively as key overrides in `.irori.json` applied by `irori apply`. Both go through `internal/overrides` so comments survive.
 - **A config key's description is the comment its own file carries.** There is deliberately no hand-written catalog for third-party cores — a fork's own comments are the documentation. `server.properties` is the exception and keeps `props.Catalog`.
 - **Java detection has two floors**: `cfg.Java.Major` from mcjars, otherwise `java.RequiredFor(mcVersion)`. With no floor at all, prefer the **newest** JDK — preferring the lowest is what made a NixOS box try to start a modern server on a stray Java 8.
+- **The lock is written by whoever installs, not by `irori apply`.** Every install path goes through `internal/install`, which saves `.irori.lock.json` before it returns; the caller saves `.irori.json`. `irori apply` converges a directory it did not build, it is not a step you must remember after one.
+- **Declared config keys are an overlay, never a replacement.** The core generates its own config, then irori writes the declared keys over it through `internal/overrides`. On NixOS the module does this in `preStart` with the values `irori nix` rendered into the artifacts file. Plugin configs are deliberately out of scope: no pristine copy of one exists to diff against.
 - **On NixOS the daemon runs as a systemd unit** (`nix/module.nix`, `services.irori.servers.<name>`), not by self-detaching. Jars and plugins come from the store: `irori nix` renders the lock as `fetchurl` FODs and the unit sets `IRORI_SEALED=1`, which makes irori refuse to download anything.
 
 ## Commands

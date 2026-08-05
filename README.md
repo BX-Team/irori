@@ -33,7 +33,7 @@ The server process belongs to a small detached daemon, not to your terminal. Sta
 - **Files** — browse, preview, edit and delete inside the server directory.
 - **Plugins & mods** — search Modrinth, install, update and remove; everything installed is recorded in `.irori.lock.json`.
 - **Configs** — every config file the core ships, flattened to dotted keys. A key's documentation is the comment its own file carries, so forks document themselves. Edits go back through a writer that preserves comments and formatting.
-- **Declarative** — keys you pin in `.irori.json` are re-applied by `irori apply`, together with the core and plugin set.
+- **Declarative** — keys you pin in `.irori.json` are re-applied by `irori apply`, together with the core and plugin set. `irori config import` fills them in for you by diffing the directory against the configs the core ships.
 - **Java** — the right JDK is found and version-checked before a start, instead of after a crash.
 
 # 📦 Installation
@@ -143,8 +143,10 @@ An empty directory opens the wizard: pick a core (Paper, Purpur, Fabric, Velocit
 | `irori cmd <command…>` | Send one command to the server console |
 | `irori logs` | Follow the console |
 | `irori apply` | Install the core and plugins declared in `.irori.json`, prune the rest, re-apply pinned config keys |
+| `irori config diff` | Show the config keys that differ from the ones the core ships |
+| `irori config import` | Declare those keys in `.irori.json` |
 | `irori defaults [file…]` | List the config files the build ships, or restore one to pristine |
-| `irori nix [-o file]` | Render `.irori.lock.json` as a Nix expression |
+| `irori nix [-o file]` | Render `.irori.lock.json` as a Nix expression; `--strict` fails when anything in the directory is missing from the lock |
 
 `-C, --dir` points any of them at another directory.
 
@@ -152,9 +154,10 @@ An empty directory opens the wizard: pick a core (Paper, Purpur, Fabric, Velocit
 
 Downloading a jar at runtime is wrong on NixOS, so the flake exposes a module that runs the daemon as a systemd unit and builds the server's artifacts into the store instead.
 
-Set the server up once (wizard, `irori apply`), then render the lock:
+Set the server up once — the wizard, the Plugins tab, whatever the server needs. Everything installed is recorded in `.irori.lock.json` as it happens, so the lock is ready as soon as the server is. Declare the config keys you changed, then render:
 
 ```bash
+irori config import   # or press C in the Configs tab
 irori nix -o survival.nix
 ```
 
@@ -168,6 +171,8 @@ irori nix -o survival.nix
     # The file `irori nix` wrote. Its jar and plugins are fetched into the
     # store and symlinked into `directory` before the server starts, and the
     # unit runs with IRORI_SEALED=1 so irori never downloads anything itself.
+    # The config keys it carries are written over the files the core generates
+    # on every start, comments and all the untouched keys left as they are.
     artifacts = ./survival.nix;
 
     jdk = pkgs.jdk21_headless;
@@ -183,7 +188,7 @@ Each server becomes an `irori-<name>.service`. `systemctl stop` walks the server
 | ------ | ---- | ------- | ------ |
 | `enable` | bool | `true` | Whether to generate a unit for this server. |
 | `directory` | str | — | The server directory. Must already hold a `.irori.json`. |
-| `artifacts` | null or path | `null` | The expression `irori nix` rendered. Linked in before start. |
+| `artifacts` | null or path | `null` | The expression `irori nix` rendered. Jar and plugins are linked in and its declared config keys applied before start. |
 | `user` / `group` | str | `irori` | Identity the server runs as; the default user and group are created for you. |
 | `jdk` | package | `pkgs.jdk21_headless` | Put on the unit's `PATH` and exported as `JAVA_HOME`. |
 | `port` | port | `25565` | Port opened when `openFirewall` is set. |
