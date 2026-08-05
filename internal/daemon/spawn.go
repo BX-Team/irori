@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"syscall"
 
 	"github.com/bx-team/irori/internal/ipc"
 	"github.com/bx-team/irori/internal/models"
@@ -26,7 +25,7 @@ func spawnDetached(dir string) error {
 	cmd.Stdin = nil
 	cmd.Stdout = nil
 	cmd.Stderr = nil
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	newSession(cmd)
 	cmd.Env = append(os.Environ(), "IRORI_DAEMON=1")
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("could not start daemon: %w", err)
