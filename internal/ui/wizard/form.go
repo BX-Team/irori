@@ -1,6 +1,7 @@
 package wizard
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/bx-team/irori/internal/launch"
@@ -73,17 +74,17 @@ func (m *Model) applyForm() error {
 
 	xmsMB, err := launch.ParseMemMB(xms)
 	if err != nil {
-		return fmt.Errorf("Xms: %w", err)
+		return fmt.Errorf("invalid Xms: %w", err)
 	}
 	xmxMB, err := launch.ParseMemMB(xmx)
 	if err != nil {
-		return fmt.Errorf("Xmx: %w", err)
+		return fmt.Errorf("invalid Xmx: %w", err)
 	}
 	if xmsMB > xmxMB {
-		return fmt.Errorf("Xms cannot exceed Xmx")
+		return errors.New("initial heap (Xms) cannot exceed the maximum (Xmx)")
 	}
 	if xmxMB < 512 {
-		return fmt.Errorf("Xmx below 512M — the server will not come up")
+		return errors.New("maximum heap (Xmx) below 512M — the server will not come up")
 	}
 
 	m.cfg.Server.Name = name

@@ -34,7 +34,7 @@ func logsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			defer conn.Close()
+			defer func() { _ = conn.Close() }()
 			if err := conn.Send(ipc.Frame{T: ipc.Attach, Tail: n}); err != nil {
 				return err
 			}
@@ -43,7 +43,7 @@ func logsCmd() *cobra.Command {
 			signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 			go func() {
 				<-stop
-				conn.Close()
+				_ = conn.Close()
 			}()
 
 			for {

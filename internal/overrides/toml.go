@@ -8,6 +8,8 @@ import (
 
 // applyTOML edits line by line. The TOML encoders available drop comments on
 // re-encode, and velocity.toml is mostly comments explaining each option.
+//
+//nolint:unparam // shares the applier signature; see applyProperties.
 func applyTOML(raw []byte, file string, keys []string, values map[string]any) ([]byte, []Change, error) {
 	eol := "\n"
 	if strings.Contains(string(raw), "\r\n") {

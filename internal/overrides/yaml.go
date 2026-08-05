@@ -137,6 +137,8 @@ func renderYAML(n *yaml.Node) string {
 	if err := enc.Encode(n); err != nil {
 		return ""
 	}
-	enc.Close()
+	if err := enc.Close(); err != nil {
+		return ""
+	}
 	return strings.TrimSpace(buf.String())
 }

@@ -88,7 +88,7 @@ func Alive(socket string) bool {
 	if err != nil {
 		return false
 	}
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	_ = c.SetDeadline(time.Now().Add(2 * time.Second))
 	if err := c.Send(Frame{T: Ping}); err != nil {
 		return false
@@ -104,7 +104,7 @@ func Query(socket string, req Frame) (Frame, error) {
 	if err != nil {
 		return Frame{}, err
 	}
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	_ = c.SetDeadline(time.Now().Add(5 * time.Second))
 	if err := c.Send(req); err != nil {
 		return Frame{}, err
