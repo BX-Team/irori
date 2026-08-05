@@ -1,7 +1,4 @@
-// Package nixgen turns .irori.lock.json into a Nix expression. Downloading a jar
-// at runtime is fine on an ordinary VPS but wrong on NixOS, so the lock — which
-// already holds every URL and checksum — becomes fixed-output derivations that
-// the NixOS module feeds back to irori in sealed mode.
+// nixgen turns .irori.lock.json into a Nix expression
 package nixgen
 
 import (
@@ -10,10 +7,13 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/bx-team/irori/internal/config"
 	"github.com/bx-team/irori/internal/lock"
+	"github.com/bx-team/irori/internal/overrides"
+	"github.com/bx-team/irori/internal/props"
 )
 
 type Warning struct {
@@ -70,9 +70,69 @@ func Generate(cfg *config.Config, lf *lock.File) (string, []Warning) {
 		b.WriteString(fetchurl(a.File, a.URL, algo, sum, 4))
 		b.WriteString(";\n")
 	}
+	b.WriteString("  };\n")
+
+	b.WriteString("\n  configs = {\n")
+	for _, file := range sortedKeys(cfg.Configs) {
+		values := cfg.Configs[file]
+		fmt.Fprintf(&b, "    %s = {\n", nixString(file))
+		for _, key := range sortedKeys(values) {
+			if secret(file, key) {
+				warnings = append(warnings, Warning{file + " " + key,
+					"looks like a secret and everything in /nix/store is world readable"})
+			}
+			fmt.Fprintf(&b, "      %s = %s;\n", nixString(key), nixValue(values[key]))
+		}
+		b.WriteString("    };\n")
+	}
 	b.WriteString("  };\n}\n")
 
 	return b.String(), warnings
+}
+
+func sortedKeys[V any](m map[string]V) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func secret(file, key string) bool {
+	if strings.HasSuffix(file, "server.properties") && props.SpecFor(key).Secret {
+		return true
+	}
+	lower := strings.ToLower(key)
+	return strings.Contains(lower, "password") || strings.Contains(lower, "secret") ||
+		strings.Contains(lower, "token")
+}
+
+func nixValue(v any) string {
+	switch t := v.(type) {
+	case bool:
+		if t {
+			return "true"
+		}
+		return "false"
+	case float64:
+		if t == float64(int64(t)) {
+			return strconv.FormatInt(int64(t), 10)
+		}
+		return strconv.FormatFloat(t, 'f', -1, 64)
+	case int:
+		return strconv.Itoa(t)
+	case nil:
+		return `""`
+	default:
+		return nixString(overrides.Scalar(v))
+	}
+}
+
+// Nix interpolates ${...} inside a double-quoted string, so a motd that happens
+// to contain one has to arrive escaped or the expression will not even parse.
+func nixString(s string) string {
+	return strings.ReplaceAll(strconv.Quote(s), "${", `\${`)
 }
 
 func fetchurl(name, url, algo, hexSum string, indent int) string {
@@ -84,8 +144,6 @@ func fetchurl(name, url, algo, hexSum string, indent int) string {
 		pad + "}"
 }
 
-// sri converts the hex digests both APIs return into the base64 SRI form Nix
-// wants in `hash`.
 func sri(algo, hexSum string) string {
 	raw, err := hex.DecodeString(hexSum)
 	if err != nil {

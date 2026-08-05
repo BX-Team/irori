@@ -55,6 +55,56 @@ func TestGenerateRendersSRIHashesAndSafeAttrNames(t *testing.T) {
 	}
 }
 
+// The configs attrset is read back by the NixOS module and handed to
+// `irori apply --only config`, so it has to be Nix the module can import at
+// all: dotted keys need quoting, a number must not arrive as a string, and a
+// motd carrying ${…} would otherwise be read as interpolation.
+func TestGenerateRendersDeclaredConfigKeys(t *testing.T) {
+	cfg := config.Default("/srv/minecraft/survival")
+	cfg.Server.Type = models.TypePaper
+	cfg.SetOverride("server.properties", "difficulty", "hard")
+	cfg.SetOverride("server.properties", "view-distance", float64(10))
+	cfg.SetOverride("server.properties", "motd", "welcome ${player}")
+	cfg.SetOverride("config/paper-global.yml", "chunk-system.gen-parallelism", true)
+
+	out, warnings := nixgen.Generate(cfg, lock.New("/srv/minecraft/survival/.irori.lock.json"))
+	for _, want := range []string{
+		`"server.properties" = {`,
+		`"difficulty" = "hard";`,
+		`"view-distance" = 10;`,
+		`"motd" = "welcome \${player}";`,
+		`"chunk-system.gen-parallelism" = true;`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("rendered expression is missing %s\n---\n%s", want, out)
+		}
+	}
+	for _, w := range warnings {
+		if strings.Contains(w.Target, "difficulty") {
+			t.Errorf("an ordinary key was reported as a secret: %+v", w)
+		}
+	}
+}
+
+// /nix/store is world readable, so a password declared by hand has to be
+// called out rather than quietly rendered into it.
+func TestGenerateWarnsAboutSecretsInTheStore(t *testing.T) {
+	cfg := config.Default("/srv/minecraft/survival")
+	cfg.Server.Type = models.TypePaper
+	cfg.SetOverride("server.properties", "rcon.password", "hunter2")
+
+	_, warnings := nixgen.Generate(cfg, lock.New("/srv/minecraft/survival/.irori.lock.json"))
+	found := false
+	for _, w := range warnings {
+		if strings.Contains(w.Target, "rcon.password") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("no warning for a secret rendered into the store: %+v", warnings)
+	}
+}
+
 // A core that an installer produces is not one download, so it cannot become a
 // fixed-output derivation. Rendering it as one would give NixOS hosts a jar
 // that never matches.

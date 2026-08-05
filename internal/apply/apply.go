@@ -24,6 +24,11 @@ type Options struct {
 	DryRun bool
 	Update bool
 	Sealed bool
+	// Only limits the run to one kind of step; empty means all of them.
+	Only Kind
+	// Configs replaces the keys declared in .irori.json. It is how the NixOS
+	// module hands over the values it carries in the store instead.
+	Configs map[string]map[string]any
 }
 
 type Kind string
@@ -94,10 +99,15 @@ func Run(ctx context.Context, cfg *config.Config, opts Options, onStep func(Step
 		res:  &res,
 	}
 
-	e.core(ctx)
-	e.plugins(ctx)
-	e.configs()
-
+	if e.wants(KindCore) {
+		e.core(ctx)
+	}
+	if e.wants(KindPlugin) {
+		e.plugins(ctx)
+	}
+	if e.wants(KindConfig) {
+		e.configs()
+	}
 	return res, res.Err()
 }
 
@@ -328,15 +338,21 @@ func (e *engine) fetchAddon(ctx context.Context, client *modrinth.Client, ref co
 	return lock.Addon{}, fmt.Errorf("unknown plugin source %q", ref.Source)
 }
 
+func (e *engine) wants(k Kind) bool { return e.opts.Only == "" || e.opts.Only == k }
+
 func (e *engine) configs() {
-	files := make([]string, 0, len(e.cfg.Configs))
-	for f := range e.cfg.Configs {
+	declared := e.cfg.Configs
+	if e.opts.Configs != nil {
+		declared = e.opts.Configs
+	}
+	files := make([]string, 0, len(declared))
+	for f := range declared {
 		files = append(files, f)
 	}
 	sort.Strings(files)
 
 	for _, file := range files {
-		changes, err := overrides.Apply(e.h, file, e.cfg.Configs[file], e.opts.DryRun)
+		changes, err := overrides.Apply(e.h, file, declared[file], e.opts.DryRun)
 		if err != nil {
 			e.emit(Step{Kind: KindConfig, Action: "set", Target: file, Err: err})
 			continue

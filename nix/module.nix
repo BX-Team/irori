@@ -48,6 +48,11 @@ self: {
           plugins are fetched into the store and symlinked into
           {option}`directory` before the server starts, and the unit runs sealed
           so irori never downloads anything itself.
+
+          The `configs` attribute it carries is applied on top of the files the
+          core generates, on every start. Keys declared there are therefore
+          owned by this file: editing them on the host does not survive a
+          restart.
         '';
       };
 
@@ -94,8 +99,9 @@ self: {
     };
   };
 
-  # `irori nix` writes `{ fetchurl }: { name, type, mcVersion, jar, plugins }`,
-  # so the module only has to apply fetchurl and link what comes back.
+  # `irori nix` writes `{ fetchurl }: { name, type, mcVersion, jar, plugins,
+  # configs }`, so the module only has to apply fetchurl and link what comes
+  # back. `configs` is newer than the rest, hence the `or {}` below.
   artifactsOf = srv:
     if srv.artifacts == null
     then null
@@ -117,6 +123,21 @@ self: {
         a.plugins)}
     '';
 
+  # The core writes its own defaults on first start, so the declared keys are
+  # laid over whatever is there rather than replacing the file. irori touches
+  # only these keys and leaves every comment around them alone.
+  applyConfigs = name: srv: let
+    a = artifactsOf srv;
+    values =
+      if a == null
+      then {}
+      else a.configs or {};
+    file = pkgs.writeText "irori-${name}-configs.json" (builtins.toJSON values);
+  in
+    optionalString (values != {}) ''
+      ${getExe cfg.package} apply --dir ${srv.directory} --only config --overrides ${file}
+    '';
+
   unitFor = name: srv:
     nameValuePair "irori-${name}" {
       description = "Minecraft server ${name} (irori)";
@@ -133,7 +154,7 @@ self: {
         }
         // srv.environment;
 
-      preStart = linkArtifacts srv;
+      preStart = linkArtifacts srv + applyConfigs name srv;
 
       serviceConfig = {
         Type = "simple";
