@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/bx-team/irori/internal/config"
@@ -106,6 +108,19 @@ func Run(opts Options) error {
 		if d.logw != nil {
 			d.logw.Close()
 		}
+	}()
+
+	// A supervisor (systemd, a container runtime, a plain kill) terminates the
+	// daemon, not the server. Turn that into the same graceful shutdown the
+	// quit path already implements, or java is left to be killed with the
+	// process group and the world never saves.
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sig)
+	go func() {
+		<-sig
+		d.note("received a shutdown signal, stopping the server")
+		d.Quit()
 	}()
 
 	go d.accept()
@@ -288,7 +303,7 @@ func (c *client) send(f ipc.Frame) error {
 
 func (d *Daemon) serveClient(conn *ipc.Conn) {
 	c := &client{conn: conn}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	for {
 		f, err := conn.Recv()
