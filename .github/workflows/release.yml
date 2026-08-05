@@ -1,0 +1,217 @@
+name: Release Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. 1.2.3)"
+        required: true
+        type: string
+      prerelease:
+        description: "Mark as pre-release"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Prepare Release Metadata
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      previous_tag: ${{ steps.prev_tag.outputs.latest_tag }}
+      changelog: ${{ steps.changelog.outputs.changelog }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Validate version format
+        shell: bash
+        run: |
+          if ! [[ "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid version: ${{ inputs.version }}"
+            echo "Expected semver format, e.g. 1.2.3 or 1.2.3-rc.1"
+            exit 1
+          fi
+
+      - name: Set version in flake.nix
+        shell: bash
+        run: |
+          sed -i '/pname = "irori";/,/version = / s/version = "[^"]*";/version = "${{ inputs.version }}";/' flake.nix
+
+      - name: Commit version bump
+        uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: "chore(release): bump version to ${{ inputs.version }}"
+
+      - name: Compute release tag
+        id: meta
+        shell: bash
+        run: echo "tag=v${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+
+      - name: Find previous release tag
+        id: prev_tag
+        shell: bash
+        run: |
+          latest_tag="$(git tag --list 'v*' --sort=-version:refname | grep -vx "v${{ inputs.version }}" | head -n 1)"
+          if [ -z "$latest_tag" ]; then
+            latest_tag="v${{ inputs.version }}"
+          fi
+          echo "latest_tag=$latest_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Push release tag
+        shell: bash
+        run: |
+          git tag -f "v${{ inputs.version }}" HEAD
+          git push origin "v${{ inputs.version }}" --force
+
+      - name: Build Changelog
+        id: changelog
+        uses: mikepenz/release-changelog-builder-action@v6
+        with:
+          mode: COMMIT
+          fromTag: ${{ steps.prev_tag.outputs.latest_tag }}
+          toTag: v${{ inputs.version }}
+          configuration: ".github/changelog_configuration.json"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create draft release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ inputs.version }}
+          name: irori ${{ inputs.version }}
+          body: Draft release. Assets are uploaded by the build matrix.
+          draft: true
+          prerelease: ${{ inputs.prerelease }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Everything is CGO-free, so every target cross-compiles from one Linux runner.
+  build:
+    name: Build (${{ matrix.goos }}/${{ matrix.goarch }}${{ matrix.goarm && format('v{0}', matrix.goarm) || '' }})
+    needs: [prepare]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: linux, goarch: amd64 }
+          - { goos: linux, goarch: arm64 }
+          - { goos: linux, goarch: arm, goarm: "7" }
+          - { goos: linux, goarch: riscv64 }
+          - { goos: darwin, goarch: amd64 }
+          - { goos: darwin, goarch: arm64 }
+          - { goos: windows, goarch: amd64 }
+          - { goos: windows, goarch: arm64 }
+          - { goos: freebsd, goarch: amd64 }
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: v${{ inputs.version }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: Build binary
+        shell: bash
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+        run: |
+          mkdir -p dist
+          binary="irori"
+          if [ "$GOOS" = "windows" ]; then binary="irori.exe"; fi
+          go build -v -trimpath \
+            -ldflags "-s -w -buildid= -X main.version=${{ inputs.version }}" \
+            -o "dist/$binary" ./cmd/irori
+
+      - name: Package archive
+        id: pkg
+        shell: bash
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          suffix="$GOOS-$GOARCH"
+          if [ -n "${{ matrix.goarm }}" ]; then suffix="$suffix-v${{ matrix.goarm }}"; fi
+          cp README.md dist/
+          cd dist
+          if [ "$GOOS" = "windows" ]; then
+            asset="irori-$suffix.zip"
+            zip -9 -r "../$asset" .
+          else
+            asset="irori-$suffix.tar.gz"
+            tar -czf "../$asset" .
+          fi
+          cd ..
+          sha256sum "$asset" | awk '{print $1}' > "$asset.sha256"
+          echo "asset=$asset" >> "$GITHUB_OUTPUT"
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ inputs.version }}
+          files: |
+            ${{ steps.pkg.outputs.asset }}
+            ${{ steps.pkg.outputs.asset }}.sha256
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  cachix:
+    name: Push to Cachix
+    needs: [prepare]
+    runs-on: ubuntu-latest
+    if: ${{ ! inputs.prerelease }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: v${{ inputs.version }}
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Set up Cachix
+        uses: cachix/cachix-action@v17
+        with:
+          name: bx-team
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Build (and push) the flake package
+        run: nix build --print-build-logs .#irori
+
+  publish:
+    name: Publish release
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Finalize release with changelog
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          name: irori ${{ needs.prepare.outputs.tag }}
+          body: ${{ needs.prepare.outputs.changelog }}
+          draft: false
+          prerelease: ${{ inputs.prerelease }}
+          token: ${{ secrets.GITHUB_TOKEN }}
