@@ -45,7 +45,7 @@ func (c *Client) Download(ctx context.Context, f File, dst string, onProgress fu
 	if err != nil {
 		return err
 	}
-	defer os.Remove(tmp)
+	defer func() { _ = os.Remove(tmp) }()
 
 	var sum hash.Hash
 	var want string

@@ -124,7 +124,9 @@ func inlineYAML(n *yaml.Node) string {
 	if err := enc.Encode(n); err != nil {
 		return "…"
 	}
-	enc.Close()
+	if err := enc.Close(); err != nil {
+		return "…"
+	}
 
 	fields := strings.Fields(buf.String())
 	text := strings.Join(fields, " ")

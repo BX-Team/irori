@@ -39,7 +39,7 @@ func (i Installed) Display() string {
 func Scan(h host.Backend, dir string) ([]Installed, error) {
 	entries, err := h.ReadDir(dir)
 	if err != nil {
-		return nil, nil
+		return nil, nil //nolint:nilerr // see above: no addon directory means no addons
 	}
 
 	var out []Installed

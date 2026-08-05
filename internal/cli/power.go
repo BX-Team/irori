@@ -188,7 +188,7 @@ func sendCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			defer conn.Close()
+			defer func() { _ = conn.Close() }()
 			return conn.Send(ipc.Frame{T: ipc.Input, Data: strings.Join(args, " ")})
 		},
 	}

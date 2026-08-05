@@ -103,11 +103,11 @@ func (c *Client) download(ctx context.Context, s Step, dir string, onBytes func(
 	_, err = io.Copy(f, &countingReader{r: resp.Body, onRead: onBytes})
 	closeErr := f.Close()
 	if err != nil {
-		os.Remove(tmp)
+		_ = os.Remove(tmp)
 		return err
 	}
 	if closeErr != nil {
-		os.Remove(tmp)
+		_ = os.Remove(tmp)
 		return closeErr
 	}
 	return os.Rename(tmp, dst)
@@ -139,7 +139,7 @@ func unzip(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	if err := os.MkdirAll(dst, 0o755); err != nil {
 		return err
@@ -176,7 +176,12 @@ func extractFile(f *zip.File, target string) error {
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	// Not a deferred close: a Close that fails after a successful copy means a
+	// truncated jar, and swallowing it would extract a corrupt file silently.
 	_, err = io.Copy(out, rc) //nolint:gosec // sizes come from a trusted index
-	return err
+	closeErr := out.Close()
+	if err != nil {
+		return err
+	}
+	return closeErr
 }

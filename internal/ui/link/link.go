@@ -47,13 +47,13 @@ func (l *Link) Connect() tea.Cmd {
 			return msgs.LinkDownMsg{Err: err}
 		}
 		if err := conn.Send(ipc.Frame{T: ipc.Attach, Tail: l.tail}); err != nil {
-			conn.Close()
+			_ = conn.Close()
 			return msgs.LinkDownMsg{Err: err}
 		}
 
 		l.mu.Lock()
 		if l.conn != nil {
-			l.conn.Close()
+			_ = l.conn.Close()
 		}
 		l.conn = conn
 		l.gen++
@@ -134,7 +134,7 @@ func (l *Link) Close() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.conn != nil {
-		l.conn.Close()
+		_ = l.conn.Close()
 		l.conn = nil
 		l.gen++
 	}

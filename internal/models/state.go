@@ -40,7 +40,7 @@ const (
 	LevelError LogLevel = "error"
 	LevelDebug LogLevel = "debug"
 	LevelChat  LogLevel = "chat"
-	LevelIrori  LogLevel = "irori"
+	LevelIrori LogLevel = "irori"
 )
 
 type LogLine struct {

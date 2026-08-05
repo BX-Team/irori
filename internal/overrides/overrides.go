@@ -99,6 +99,10 @@ func format(file string) string {
 	return ""
 }
 
+// The error is always nil here, but every applier shares one signature so
+// format() can dispatch to them; the yaml and json ones do fail.
+//
+//nolint:unparam
 func applyProperties(raw []byte, file string, keys []string, values map[string]any) ([]byte, []Change, error) {
 	f := props.Parse(raw)
 	var changes []Change

@@ -380,7 +380,8 @@ func (c *Configs) handleEntryKey(k tea.KeyMsg) (Screen, tea.Cmd) {
 	case "D":
 		return c, c.resetToDefault()
 	case "u":
-		return c, c.undo()
+		c.undo()
+		return c, nil
 	case "c":
 		return c, c.toggleDeclared()
 	case "e":
@@ -418,14 +419,13 @@ func (c *Configs) resetToDefault() tea.Cmd {
 	return toast(f.Key+" reset to default", models.LevelIrori)
 }
 
-func (c *Configs) undo() tea.Cmd {
+func (c *Configs) undo() {
 	f, ok := c.fields.Selected()
 	od, open := c.doc()
 	if !ok || !open {
-		return nil
+		return
 	}
 	c.setValue(f.Key, od.orig[f.Key])
-	return nil
 }
 
 func (c *Configs) setValue(key, value string) {

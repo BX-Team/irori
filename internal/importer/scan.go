@@ -55,7 +55,7 @@ func ScanJars(dir string) ([]Candidate, error) {
 	var out []Candidate
 	err := filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // an unreadable entry is skipped, not fatal to the scan
 		}
 		rel, _ := filepath.Rel(dir, p)
 		if d.IsDir() {
@@ -73,7 +73,7 @@ func ScanJars(dir string) ([]Candidate, error) {
 		}
 		info, err := d.Info()
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // a jar that vanished mid-walk is not a candidate
 		}
 		t, v := guessFromName(d.Name())
 		out = append(out, Candidate{File: filepath.ToSlash(rel), Size: info.Size(), Type: t, Version: v})
