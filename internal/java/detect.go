@@ -126,12 +126,12 @@ func quickCandidates() []candidate {
 	}
 
 	if h := os.Getenv("JAVA_HOME"); h != "" {
-		add(filepath.Join(h, "bin", "java"), "JAVA_HOME")
+		add(filepath.Join(h, "bin", javaBin), "JAVA_HOME")
 	}
 	if p, err := exec.LookPath("java"); err == nil {
 		add(p, "PATH")
 	}
-	for _, pat := range []string{"/usr/lib/jvm/*/bin/java", "/usr/java/*/bin/java", "/opt/java/*/bin/java"} {
+	for _, pat := range systemGlobs {
 		matches, _ := filepath.Glob(pat)
 		for _, m := range matches {
 			add(m, "system")

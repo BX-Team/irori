@@ -37,17 +37,6 @@ type proc struct {
 	prevAt   time.Time
 }
 
-// signalGroup targets the whole process group: java spawns helper processes and
-// a bare kill on the pid can leave them behind.
-func (p *proc) signalGroup(sig syscall.Signal) {
-	if p.pid <= 0 {
-		return
-	}
-	if err := syscall.Kill(-p.pid, sig); err != nil {
-		_ = syscall.Kill(p.pid, sig)
-	}
-}
-
 func (d *Daemon) doStart() error {
 	d.mu.Lock()
 	if d.proc != nil {
@@ -93,7 +82,7 @@ func (d *Daemon) doStart() error {
 	cmd.Dir = d.cfg.Dir()
 	cmd.Stdout = pw
 	cmd.Stderr = pw
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	newProcessGroup(cmd)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		pr.Close()
