@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/bx-team/irori/internal/host"
+	"github.com/bx-team/irori/internal/install"
 	"github.com/bx-team/irori/internal/lock"
 	"github.com/bx-team/irori/internal/nixgen"
 	"github.com/spf13/cobra"
@@ -27,9 +29,20 @@ func nixCmd() *cobra.Command {
 				return err
 			}
 
+			issues, err := install.Sync(install.Target{H: host.NewLocal(cfg.Dir()), Cfg: cfg, Lock: lf})
+			if err != nil {
+				return err
+			}
 			out, warnings := nixgen.Generate(cfg, lf)
+			for _, i := range issues {
+				fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s\n", i)
+			}
 			for _, w := range warnings {
 				fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s: %s\n", w.Target, w.Reason)
+			}
+			if strict, _ := cmd.Flags().GetBool("strict"); strict && len(issues)+len(warnings) > 0 {
+				return fmt.Errorf("%d warning(s) and --strict is set: the expression would not describe this directory",
+					len(issues)+len(warnings))
 			}
 
 			target, _ := cmd.Flags().GetString("output")
@@ -45,6 +58,7 @@ func nixCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringP("output", "o", "-", "file to write to, or - for stdout")
+	cmd.Flags().Bool("strict", false, "fail if anything in the directory is missing from the lock")
 	return cmd
 }
 
