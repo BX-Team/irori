@@ -4,7 +4,10 @@ import (
 	"context"
 	"time"
 
+	"github.com/bx-team/irori/internal/host"
 	"github.com/bx-team/irori/internal/importer"
+	"github.com/bx-team/irori/internal/install"
+	"github.com/bx-team/irori/internal/lock"
 	"github.com/bx-team/irori/internal/mcjars"
 	"github.com/bx-team/irori/internal/models"
 	tea "github.com/charmbracelet/bubbletea"
@@ -91,13 +94,19 @@ func scanExisting(c *mcjars.Client, dir string) tea.Cmd {
 func (m *Model) startInstall(build mcjars.Build) tea.Cmd {
 	progress := make(chan mcjars.Progress, 64)
 	m.progressCh = progress
+	cfg, client := m.cfg, m.client
 
 	return tea.Batch(
 		waitProgress(progress),
 		func() tea.Msg {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 			defer cancel()
-			err := m.client.Install(ctx, build, m.dir, func(p mcjars.Progress) {
+			lf, err := lock.Load(cfg.LockPath())
+			if err != nil {
+				lf = lock.New(cfg.LockPath())
+			}
+			target := install.Target{H: host.NewLocal(cfg.Dir()), Cfg: cfg, Lock: lf}
+			err = install.Core(ctx, target, client, build, func(p mcjars.Progress) {
 				select {
 				case progress <- p:
 				default:

@@ -4,18 +4,13 @@ package apply
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
-	"os"
-	"path"
 	"sort"
-	"strings"
 
 	"github.com/bx-team/irori/internal/config"
 	"github.com/bx-team/irori/internal/host"
+	"github.com/bx-team/irori/internal/install"
 	"github.com/bx-team/irori/internal/lock"
 	"github.com/bx-team/irori/internal/mcjars"
 	"github.com/bx-team/irori/internal/modrinth"
@@ -80,6 +75,10 @@ type engine struct {
 	res  *Result
 }
 
+func (e *engine) target() install.Target {
+	return install.Target{H: e.h, Cfg: e.cfg, Lock: e.lf}
+}
+
 func Run(ctx context.Context, cfg *config.Config, opts Options, onStep func(Step)) (Result, error) {
 	lf, err := lock.Load(cfg.LockPath())
 	if err != nil {
@@ -99,11 +98,6 @@ func Run(ctx context.Context, cfg *config.Config, opts Options, onStep func(Step
 	e.plugins(ctx)
 	e.configs()
 
-	if !opts.DryRun && res.Changed > 0 {
-		if err := e.lf.Save(); err != nil {
-			return res, err
-		}
-	}
 	return res, res.Err()
 }
 
@@ -161,26 +155,9 @@ func (e *engine) core(ctx context.Context) {
 		e.emit(Step{Kind: KindCore, Action: "install", Target: target, Err: err})
 		return
 	}
-	if err := client.Install(ctx, build, e.cfg.Dir(), nil); err != nil {
+	if err := install.Core(ctx, e.target(), client, build, nil); err != nil {
 		e.emit(Step{Kind: KindCore, Action: "install", Target: target, Err: err})
 		return
-	}
-
-	e.cfg.Server.Build = build.Name
-	e.cfg.Server.BuildID = build.UUID
-	e.cfg.Server.Jar = build.CoreJar()
-	e.lf.Core = &lock.Core{
-		Type:      string(c.Type),
-		MCVersion: c.MCVersion,
-		Build:     build.Name,
-		File:      build.CoreJar(),
-		URL:       coreURL(build),
-		Direct:    directDownload(build),
-	}
-	if e.lf.Core.Direct {
-		if sum, size, err := hashFile(e.h, build.CoreJar()); err == nil {
-			e.lf.Core.SHA256, e.lf.Core.Size = sum, size
-		}
 	}
 	if err := e.cfg.Save(); err != nil {
 		e.emit(Step{Kind: KindCore, Action: "install", Target: target, Err: err})
@@ -207,51 +184,6 @@ func (e *engine) resolveBuild(ctx context.Context, client *mcjars.Client) (mcjar
 		c.Build, c.Type.Display(), c.MCVersion)
 }
 
-// directDownload reports a recipe that is a single jar download with no
-// unpacking, which is the only shape Nix can express as one fetchurl.
-func directDownload(b mcjars.Build) bool {
-	downloads := 0
-	for _, group := range b.Installation {
-		for _, s := range group {
-			switch s.Type {
-			case "download":
-				if !strings.HasSuffix(strings.ToLower(s.File), ".jar") {
-					return false
-				}
-				downloads++
-			default:
-				return false
-			}
-		}
-	}
-	return downloads == 1
-}
-
-func hashFile(h host.Backend, name string) (string, int64, error) {
-	f, err := h.Open(name)
-	if err != nil {
-		return "", 0, err
-	}
-	defer f.Close()
-	sum := sha256.New()
-	size, err := io.Copy(sum, f)
-	if err != nil {
-		return "", 0, err
-	}
-	return hex.EncodeToString(sum.Sum(nil)), size, nil
-}
-
-func coreURL(b mcjars.Build) string {
-	for _, group := range b.Installation {
-		for _, s := range group {
-			if s.Type == "download" && strings.HasSuffix(strings.ToLower(s.File), ".jar") {
-				return s.URL
-			}
-		}
-	}
-	return ""
-}
-
 func (e *engine) plugins(ctx context.Context) {
 	dir := e.cfg.Server.Type.AddonDir()
 	installed, _ := plugins.Scan(e.h, dir)
@@ -265,7 +197,7 @@ func (e *engine) plugins(ctx context.Context) {
 				if client == nil {
 					client = modrinth.New()
 				}
-				e.updateAddon(ctx, client, item, dir)
+				e.updateAddon(ctx, client, item)
 				continue
 			}
 			e.emit(Step{Kind: KindPlugin, Action: "ok", Target: item.Name})
@@ -274,10 +206,10 @@ func (e *engine) plugins(ctx context.Context) {
 			if client == nil {
 				client = modrinth.New()
 			}
-			e.installAddon(ctx, client, item, dir)
+			e.installAddon(ctx, client, item)
 
 		case plugins.StateOrphan:
-			e.removeAddon(item, dir)
+			e.removeAddon(item)
 
 		case plugins.StateUntracked:
 			e.emit(Step{Kind: KindPlugin, Action: "ok", Target: item.Name,
@@ -286,7 +218,7 @@ func (e *engine) plugins(ctx context.Context) {
 	}
 }
 
-func (e *engine) installAddon(ctx context.Context, client *modrinth.Client, item plugins.Item, dir string) {
+func (e *engine) installAddon(ctx context.Context, client *modrinth.Client, item plugins.Item) {
 	action := "install"
 	if item.State == plugins.StateOutdated {
 		action = "update"
@@ -304,21 +236,17 @@ func (e *engine) installAddon(ctx context.Context, client *modrinth.Client, item
 		return
 	}
 
-	entry, err := e.fetchAddon(ctx, client, *item.Ref, dir)
+	entry, err := e.fetchAddon(ctx, client, *item.Ref)
 	if err != nil {
 		step.Err = err
 		e.emit(step)
 		return
 	}
-	if item.Lock != nil && item.Lock.File != entry.File {
-		_ = e.h.Remove(path.Join(dir, item.Lock.File))
-	}
-	e.lf.Upsert(entry)
 	step.Detail = entry.File
 	e.emit(step)
 }
 
-func (e *engine) updateAddon(ctx context.Context, client *modrinth.Client, item plugins.Item, dir string) {
+func (e *engine) updateAddon(ctx context.Context, client *modrinth.Client, item plugins.Item) {
 	step := Step{Kind: KindPlugin, Action: "update", Target: item.Name}
 	if item.Ref.Source != config.SourceModrinth {
 		e.emit(Step{Kind: KindPlugin, Action: "ok", Target: item.Name})
@@ -346,21 +274,16 @@ func (e *engine) updateAddon(ctx context.Context, client *modrinth.Client, item 
 		return
 	}
 
-	entry, err := e.downloadVersion(ctx, client, *item.Ref, version, dir)
-	if err != nil {
+	if _, err := install.Addon(ctx, e.target(), client, *item.Ref, version, nil); err != nil {
 		step.Err = err
 		e.emit(step)
 		return
 	}
-	if item.Lock != nil && item.Lock.File != entry.File {
-		_ = e.h.Remove(path.Join(dir, item.Lock.File))
-	}
-	e.lf.Upsert(entry)
 	step.Detail = version.Label()
 	e.emit(step)
 }
 
-func (e *engine) removeAddon(item plugins.Item, dir string) {
+func (e *engine) removeAddon(item plugins.Item) {
 	step := Step{Kind: KindPlugin, Action: "remove", Target: item.Name,
 		Detail: "no longer declared"}
 	if e.opts.DryRun {
@@ -368,19 +291,18 @@ func (e *engine) removeAddon(item plugins.Item, dir string) {
 		return
 	}
 	if item.Lock != nil {
-		if err := e.h.Remove(path.Join(dir, item.Lock.File)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		if err := install.RemoveAddon(e.target(), item.Lock.Key, item.Lock.File); err != nil {
 			step.Err = err
 			e.emit(step)
 			return
 		}
-		e.lf.Remove(item.Lock.Key)
 	}
 	e.emit(step)
 }
 
 func (e *engine) loaders() []string { return e.cfg.Server.Type.ModrinthLoaders() }
 
-func (e *engine) fetchAddon(ctx context.Context, client *modrinth.Client, ref config.PluginRef, dir string) (lock.Addon, error) {
+func (e *engine) fetchAddon(ctx context.Context, client *modrinth.Client, ref config.PluginRef) (lock.Addon, error) {
 	switch ref.Source {
 	case config.SourceModrinth:
 		var (
@@ -395,50 +317,15 @@ func (e *engine) fetchAddon(ctx context.Context, client *modrinth.Client, ref co
 		if err != nil {
 			return lock.Addon{}, err
 		}
-		return e.downloadVersion(ctx, client, ref, version, dir)
+		return install.Addon(ctx, e.target(), client, ref, version, nil)
 
 	case config.SourceURL:
-		name := ref.File
-		if name == "" {
-			name = path.Base(ref.URL)
-		}
-		f := modrinth.File{URL: ref.URL, Filename: name}
-		if err := client.Download(ctx, f, e.h.Abs(path.Join(dir, name)), nil); err != nil {
-			return lock.Addon{}, err
-		}
-		return lock.Addon{Key: ref.Key(), Source: string(ref.Source), Name: ref.Display(),
-			File: name, URL: ref.URL}, nil
+		return install.AddonFromURL(ctx, e.target(), client, ref)
 
 	case config.SourceLocal:
-		if _, err := e.h.Stat(path.Join(dir, ref.File)); err != nil {
-			return lock.Addon{}, fmt.Errorf("%s is declared as a local file but is not in %s/", ref.File, dir)
-		}
-		return lock.Addon{Key: ref.Key(), Source: string(ref.Source), Name: ref.Display(), File: ref.File}, nil
+		return install.AddonLocal(e.target(), ref)
 	}
 	return lock.Addon{}, fmt.Errorf("unknown plugin source %q", ref.Source)
-}
-
-func (e *engine) downloadVersion(ctx context.Context, client *modrinth.Client, ref config.PluginRef, v modrinth.Version, dir string) (lock.Addon, error) {
-	file, ok := v.PrimaryFile()
-	if !ok {
-		return lock.Addon{}, fmt.Errorf("%s %s has no downloadable file", ref.Display(), v.Label())
-	}
-	if err := client.Download(ctx, file, e.h.Abs(path.Join(dir, file.Filename)), nil); err != nil {
-		return lock.Addon{}, err
-	}
-	return lock.Addon{
-		Key:       ref.Key(),
-		Source:    string(config.SourceModrinth),
-		ID:        ref.ID,
-		ProjectID: v.ProjectID,
-		VersionID: v.ID,
-		Name:      ref.Display(),
-		File:      file.Filename,
-		URL:       file.URL,
-		SHA512:    file.Hashes.SHA512,
-		SHA1:      file.Hashes.SHA1,
-		Size:      file.Size,
-	}, nil
 }
 
 func (e *engine) configs() {

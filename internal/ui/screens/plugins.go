@@ -3,13 +3,13 @@ package screens
 import (
 	"context"
 	"fmt"
-	"path"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/bx-team/irori/internal/config"
 	"github.com/bx-team/irori/internal/host"
+	"github.com/bx-team/irori/internal/install"
 	"github.com/bx-team/irori/internal/lock"
 	"github.com/bx-team/irori/internal/models"
 	"github.com/bx-team/irori/internal/modrinth"
@@ -273,22 +273,11 @@ func (p *Plugins) install(hit modrinth.SearchResult, v modrinth.Version) tea.Cmd
 		return toast(sealedNote, models.LevelWarn)
 	}
 	cfg, h := p.cfg, p.h
-	dir := p.addonDir()
 	p.busy = "installing " + hit.Title + "…"
 
 	return func() tea.Msg {
-		file, ok := v.PrimaryFile()
-		if !ok {
-			return installDoneMsg{name: hit.Title,
-				err: fmt.Errorf("%s %s has no downloadable file", hit.Title, v.Label())}
-		}
-
 		ctx, cancel := context.WithTimeout(context.Background(), installTimeout)
 		defer cancel()
-		client := modrinth.New()
-		if err := client.Download(ctx, file, h.Abs(path.Join(dir, file.Filename)), nil); err != nil {
-			return installDoneMsg{name: hit.Title, err: err}
-		}
 
 		ref := config.PluginRef{
 			Source:  config.SourceModrinth,
@@ -296,30 +285,22 @@ func (p *Plugins) install(hit modrinth.SearchResult, v modrinth.Version) tea.Cmd
 			Version: v.ID,
 			Name:    hit.Title,
 		}
-		lf, err := lock.Load(cfg.LockPath())
-		if err != nil {
-			lf = lock.New(cfg.LockPath())
-		}
-		// Replacing an existing install leaves the old jar behind otherwise.
-		if old, ok := lf.Find(ref.Key()); ok && old.File != file.Filename {
-			_ = h.Remove(path.Join(dir, old.File))
-		}
-
-		cfg.UpsertPlugin(ref)
-		if err := cfg.Save(); err != nil {
+		if _, err := install.Addon(ctx, installTarget(cfg, h), modrinth.New(), ref, v, nil); err != nil {
 			return installDoneMsg{name: hit.Title, err: err}
 		}
-		lf.Upsert(lock.Addon{
-			Key: ref.Key(), Source: string(config.SourceModrinth), ID: hit.Slug,
-			ProjectID: v.ProjectID, VersionID: v.ID, Name: hit.Title,
-			File: file.Filename, URL: file.URL,
-			SHA512: file.Hashes.SHA512, SHA1: file.Hashes.SHA1, Size: file.Size,
-		})
-		if err := lf.Save(); err != nil {
+		if err := cfg.Save(); err != nil {
 			return installDoneMsg{name: hit.Title, err: err}
 		}
 		return installDoneMsg{name: hit.Title + " " + v.Label()}
 	}
+}
+
+func installTarget(cfg *config.Config, h host.Backend) install.Target {
+	lf, err := lock.Load(cfg.LockPath())
+	if err != nil {
+		lf = lock.New(cfg.LockPath())
+	}
+	return install.Target{H: h, Cfg: cfg, Lock: lf}
 }
 
 func (p *Plugins) remove(item plugins.Item) tea.Cmd {
@@ -327,14 +308,9 @@ func (p *Plugins) remove(item plugins.Item) tea.Cmd {
 		return toast(sealedNote, models.LevelWarn)
 	}
 	cfg, h := p.cfg, p.h
-	dir := p.addonDir()
 	name := item.Name
 
 	return func() tea.Msg {
-		lf, err := lock.Load(cfg.LockPath())
-		if err != nil {
-			lf = lock.New(cfg.LockPath())
-		}
 		file := ""
 		switch {
 		case item.Lock != nil:
@@ -342,22 +318,11 @@ func (p *Plugins) remove(item plugins.Item) tea.Cmd {
 		case item.Installed != nil:
 			file = item.Installed.File
 		}
-		if file != "" {
-			if err := h.Remove(path.Join(dir, file)); err != nil {
-				return installDoneMsg{name: name, err: err}
-			}
+		if err := install.RemoveAddon(installTarget(cfg, h), item.Key, file); err != nil {
+			return installDoneMsg{name: name, err: err}
 		}
-
-		changed := cfg.RemovePlugin(item.Key)
-		if changed {
-			if err := cfg.Save(); err != nil {
-				return installDoneMsg{name: name, err: err}
-			}
-		}
-		if lf.Remove(item.Key) {
-			if err := lf.Save(); err != nil {
-				return installDoneMsg{name: name, err: err}
-			}
+		if err := cfg.Save(); err != nil {
+			return installDoneMsg{name: name, err: err}
 		}
 		return installDoneMsg{name: "removed " + name}
 	}
@@ -367,22 +332,16 @@ func (p *Plugins) declare(item plugins.Item) tea.Cmd {
 	if item.Installed == nil {
 		return nil
 	}
-	cfg := p.cfg
+	cfg, h := p.cfg, p.h
 	name := item.Name
 	file := item.Installed.File
 
 	return func() tea.Msg {
-		lf, err := lock.Load(cfg.LockPath())
-		if err != nil {
-			lf = lock.New(cfg.LockPath())
-		}
 		ref := config.PluginRef{Source: config.SourceLocal, File: file, Name: name}
-		cfg.UpsertPlugin(ref)
-		if err := cfg.Save(); err != nil {
+		if _, err := install.AddonLocal(installTarget(cfg, h), ref); err != nil {
 			return installDoneMsg{name: name, err: err}
 		}
-		lf.Upsert(lock.Addon{Key: ref.Key(), Source: string(config.SourceLocal), Name: name, File: file})
-		if err := lf.Save(); err != nil {
+		if err := cfg.Save(); err != nil {
 			return installDoneMsg{name: name, err: err}
 		}
 		return installDoneMsg{name: name + " is now declared in " + config.FileName}
