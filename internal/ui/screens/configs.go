@@ -1,12 +1,16 @@
 package screens
 
 import (
+	"context"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/bx-team/irori/internal/confdiff"
 	"github.com/bx-team/irori/internal/config"
 	"github.com/bx-team/irori/internal/confs"
 	"github.com/bx-team/irori/internal/host"
+	"github.com/bx-team/irori/internal/mcjars"
 	"github.com/bx-team/irori/internal/models"
 	"github.com/bx-team/irori/internal/props"
 	"github.com/bx-team/irori/internal/ui/components"
@@ -26,6 +30,13 @@ const (
 	minDetailCols = 96
 	minThreeCols  = 126
 )
+
+type configDiffMsg struct {
+	res confdiff.Result
+	err error
+}
+
+type configDeclareMsg struct{ changes []confdiff.Change }
 
 type configPane int
 
@@ -282,6 +293,15 @@ func (c *Configs) Update(msg tea.Msg) (Screen, tea.Cmd) {
 		c.running = false
 		return c, nil
 
+	case configDiffMsg:
+		if m.err != nil {
+			return c, errToast("Config", m.err)
+		}
+		return c, c.confirmDeclare(m.res)
+
+	case configDeclareMsg:
+		return c, c.declare(m.changes)
+
 	case tea.KeyMsg:
 		return c.handleKey(m)
 
@@ -384,6 +404,8 @@ func (c *Configs) handleEntryKey(k tea.KeyMsg) (Screen, tea.Cmd) {
 		return c, nil
 	case "c":
 		return c, c.toggleDeclared()
+	case "C":
+		return c, c.declareChanged()
 	case "e":
 		if c.current == "" {
 			return c, nil
@@ -397,6 +419,62 @@ func (c *Configs) handleEntryKey(k tea.KeyMsg) (Screen, tea.Cmd) {
 		c.onChange()
 	}
 	return c, cmd
+}
+
+func (c *Configs) declareChanged() tea.Cmd {
+	if config.Sealed() {
+		return toast("sealed mode: configuration is managed by Nix", models.LevelWarn)
+	}
+	if c.cfg.Server.BuildID == "" {
+		return toast("no build id in "+config.FileName+", run irori apply first", models.LevelWarn)
+	}
+	cfg, h := c.cfg, c.h
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		shipped, err := mcjars.New().Configs(ctx, cfg.Server.BuildID)
+		if err != nil {
+			return configDiffMsg{err: err}
+		}
+		return configDiffMsg{res: confdiff.Compare(h, shipped)}
+	}
+}
+
+func (c *Configs) confirmDeclare(res confdiff.Result) tea.Cmd {
+	if res.Empty() {
+		return toast("every shipped key still holds the value "+c.cfg.Server.Type.Display()+" ships",
+			models.LevelIrori)
+	}
+	body := fmt.Sprintf("%d key(s) in %d file(s) differ from what the core ships.\n"+
+		"They will be declared in %s, so irori writes them back after every install.",
+		len(res.Changes), len(res.Compared), config.FileName)
+	if n := len(res.Skipped); n > 0 {
+		body += fmt.Sprintf("\n%d more are left alone: secrets, lists and version markers.", n)
+	}
+	return func() tea.Msg {
+		return msgs.ConfirmMsg{Title: "Declare changed keys", Body: body + "\nContinue?",
+			OnYes: configDeclareMsg{changes: res.Changes}}
+	}
+}
+
+func (c *Configs) declare(changes []confdiff.Change) tea.Cmd {
+	confdiff.Declare(c.cfg, changes)
+	if err := c.cfg.Save(); err != nil {
+		return errToast("Config", err)
+	}
+	c.refreshLocks()
+	return toast(fmt.Sprintf("declared %d key(s) in %s", len(changes), config.FileName), models.LevelIrori)
+}
+
+func (c *Configs) refreshLocks() {
+	for file, od := range c.open {
+		for i := range od.fields {
+			od.fields[i].Locked = c.cfg.HasOverride(file, od.fields[i].Key)
+		}
+	}
+	if od, ok := c.doc(); ok {
+		c.fields.SetFields(od.fields)
+	}
 }
 
 func (c *Configs) onChange() {
@@ -543,7 +621,7 @@ func (c *Configs) Hints() []components.Hint {
 		{Key: "Space/←→", Desc: "change"},
 		{Key: "Enter", Desc: "edit"},
 		{Key: "Ctrl+S", Desc: "save"},
-		{Key: "c", Desc: "declare"},
+		{Key: "c/C", Desc: "declare key/all"},
 		{Key: "u", Desc: "undo"},
 		{Key: "e", Desc: "$EDITOR"},
 		{Key: "/", Desc: "filter"},

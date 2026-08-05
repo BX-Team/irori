@@ -444,6 +444,7 @@ func (a *App) helpSections() []components.HelpSection {
 			{Key: "Ctrl+S", Desc: "save"},
 			{Key: "u", Desc: "undo the value under the cursor"},
 			{Key: "c", Desc: "declare the key in " + config.FileName},
+			{Key: "C", Desc: "declare every key that differs from the shipped default"},
 			{Key: "D", Desc: "reset to the vanilla default"},
 			{Key: "Tab", Desc: "switch between config files"},
 			{Key: "e", Desc: "open the file in $EDITOR"},

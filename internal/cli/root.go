@@ -35,6 +35,7 @@ func Execute() error {
 		sendCmd(),
 		logsCmd(),
 		applyCmd(),
+		configCmd(),
 		nixCmd(),
 		defaultsCmd(),
 	)
