@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	zone "github.com/lrstanley/bubblezone"
+	zone "github.com/lrstanley/bubblezone/v2"
 )
 
 type Tab struct {

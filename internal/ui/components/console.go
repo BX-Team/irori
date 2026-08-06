@@ -1,13 +1,14 @@
 package components
 
 import (
+	"image/color"
 	"regexp"
 	"strings"
 
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/bx-team/irori/internal/models"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -30,7 +31,7 @@ type Console struct {
 }
 
 func NewConsole(s *Styles, max int) *Console {
-	vp := viewport.New(0, 0)
+	vp := viewport.New()
 	vp.MouseWheelEnabled = true
 	return &Console{vp: vp, s: s, max: max, autoScroll: true}
 }
@@ -38,7 +39,8 @@ func NewConsole(s *Styles, max int) *Console {
 func (c *Console) SetSize(w, h int) {
 	reflow := w != c.width
 	c.width = w
-	c.vp.Width, c.vp.Height = w, h
+	c.vp.SetWidth(w)
+	c.vp.SetHeight(h)
 	if reflow {
 		c.reflow()
 		return
@@ -97,7 +99,7 @@ func (c *Console) reflow() {
 
 func (c *Console) sync() {
 	content := c.rendered
-	if pad := c.vp.Height - len(content); pad > 0 {
+	if pad := c.vp.Height() - len(content); pad > 0 {
 		content = append(make([]string, pad), content...)
 	}
 	c.vp.SetContent(strings.Join(content, "\n"))
@@ -135,7 +137,7 @@ func (c *Console) render(l models.LogLine) []string {
 	return out
 }
 
-func (c *Console) levelColor(l models.LogLevel) lipgloss.Color {
+func (c *Console) levelColor(l models.LogLevel) color.Color {
 	switch l {
 	case models.LevelWarn:
 		return c.s.T.LogWarn

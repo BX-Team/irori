@@ -3,7 +3,7 @@ package components
 import (
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 const panelPadX = 1
@@ -45,14 +45,12 @@ func (p Panel) Render(content string, s *Styles) string {
 		titleStyle = s.PanelTitleOn
 	}
 
-	// Width()/Height() cover padding but not the border, so declare the box
-	// minus the border and hand in content already sized to ContentWidth.
 	body := lipgloss.NewStyle().
 		Border(border, false, true, true, true).
 		BorderForeground(borderStyle.GetForeground()).
 		Padding(0, panelPadX).
-		Width(p.Width - 2).
-		Height(p.ContentHeight()).
+		Width(p.Width).
+		Height(p.Height - 1).
 		MaxHeight(p.Height - 1).
 		Render(content)
 

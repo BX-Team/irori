@@ -1,8 +1,8 @@
 package screens
 
 import (
+	tea "charm.land/bubbletea/v2"
 	"github.com/bx-team/irori/internal/ui/components"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 type Screen interface {

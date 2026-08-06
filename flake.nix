@@ -16,7 +16,7 @@
         version = "0.1.0";
         src = ./.;
 
-        vendorHash = "sha256-8AmDHS6V1o6kfjv6TXex6iJZTArm4Sr+9stqb34Z4vk=";
+        vendorHash = "sha256-hDUcEGYJtKFxVj6B99tLU0M8tswBJKfIt6aynVDDCOg=";
 
         subPackages = ["cmd/irori"];
         ldflags = ["-s" "-w" "-X" "main.version=0.1.0"];

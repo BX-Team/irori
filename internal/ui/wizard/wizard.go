@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
 	"github.com/bx-team/irori/internal/config"
 	"github.com/bx-team/irori/internal/importer"
 	"github.com/bx-team/irori/internal/java"
@@ -17,10 +20,7 @@ import (
 	"github.com/bx-team/irori/internal/models"
 	"github.com/bx-team/irori/internal/ui/components"
 	"github.com/bx-team/irori/internal/ui/theme"
-	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	zone "github.com/lrstanley/bubblezone"
+	zone "github.com/lrstanley/bubblezone/v2"
 )
 
 type step int
@@ -75,6 +75,7 @@ type Model struct {
 	height int
 
 	cfg      *config.Config
+	mouse    bool
 	done     bool
 	quitting bool
 }
@@ -82,11 +83,7 @@ type Model struct {
 func Run(dir string, user *config.User) (*config.Config, error) {
 	zone.NewGlobal()
 	m := New(dir, user)
-	opts := []tea.ProgramOption{tea.WithAltScreen()}
-	if user.Mouse {
-		opts = append(opts, tea.WithMouseCellMotion())
-	}
-	out, err := tea.NewProgram(m, opts...).Run()
+	out, err := tea.NewProgram(m).Run()
 	if err != nil {
 		return nil, err
 	}
@@ -107,12 +104,9 @@ func New(dir string, user *config.User) *Model {
 	list.ShowDesc = true
 	list.ZonePfx = "wz:"
 
-	filter := textinput.New()
-	filter.Prompt = "/ "
+	filter := st.TextInput("/ ", st.Warning)
 	filter.Placeholder = "type to filter"
-	filter.PromptStyle = st.Warning
-	filter.PlaceholderStyle = st.Dim
-	filter.Width = cardWidth - 12
+	filter.SetWidth(cardWidth - 12)
 
 	m := &Model{
 		dir:    dir,
@@ -122,6 +116,7 @@ func New(dir string, user *config.User) *Model {
 		list:   list,
 		filter: filter,
 		cfg:    config.Default(dir),
+		mouse:  user.Mouse,
 	}
 	m.setModeItems()
 	return m
@@ -225,7 +220,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseMsg:
 		if m.usesList() {
 			m.list.Update(msg)
-			if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
+			if components.LeftClick(msg) {
 				if _, ok := m.list.Selected(); ok {
 					return m, m.advance()
 				}

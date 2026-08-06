@@ -4,13 +4,13 @@ import (
 	"context"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/bx-team/irori/internal/host"
 	"github.com/bx-team/irori/internal/importer"
 	"github.com/bx-team/irori/internal/install"
 	"github.com/bx-team/irori/internal/lock"
 	"github.com/bx-team/irori/internal/mcjars"
 	"github.com/bx-team/irori/internal/models"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 type typesMsg struct {

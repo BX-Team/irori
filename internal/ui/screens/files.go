@@ -9,6 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/bx-team/irori/internal/config"
 	"github.com/bx-team/irori/internal/files"
 	"github.com/bx-team/irori/internal/host"
@@ -16,10 +19,7 @@ import (
 	"github.com/bx-team/irori/internal/models"
 	"github.com/bx-team/irori/internal/ui/components"
 	"github.com/bx-team/irori/internal/ui/msgs"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	zone "github.com/lrstanley/bubblezone"
+	zone "github.com/lrstanley/bubblezone/v2"
 )
 
 const (
@@ -82,15 +82,10 @@ type Files struct {
 }
 
 func NewFiles(s *components.Styles, cfg *config.Config) *Files {
-	fl := textinput.New()
-	fl.Prompt = "/ "
+	fl := s.TextInput("/ ", s.Warning)
 	fl.Placeholder = "filter"
-	fl.PromptStyle = s.Warning
-	fl.PlaceholderStyle = s.Dim
 
-	pt := textinput.New()
-	pt.Prompt = ""
-	pt.TextStyle = s.Text
+	pt := s.TextInput("", s.Text)
 
 	f := &Files{
 		cfg:        cfg,
@@ -327,11 +322,11 @@ func (f *Files) Update(msg tea.Msg) (Screen, tea.Cmd) {
 
 func (f *Files) handleMouse(m tea.MouseMsg) tea.Cmd {
 	switch {
-	case m.Button == tea.MouseButtonWheelUp:
+	case components.WheelUp(m):
 		return f.move(-1)
-	case m.Button == tea.MouseButtonWheelDown:
+	case components.WheelDown(m):
 		return f.move(1)
-	case m.Action == tea.MouseActionPress && m.Button == tea.MouseButtonLeft:
+	case components.LeftClick(m):
 		for i := f.offset; i < len(f.entries) && i < f.offset+f.rows(); i++ {
 			if zone.Get("file:" + f.entries[i].Name).InBounds(m) {
 				if f.cursor == i {
@@ -720,10 +715,10 @@ func (f *Files) listPanel(width int) string {
 
 	body := components.PadLines(strings.Join(rows, "\n"), h)
 	if f.filtering {
-		f.filter.Width = w - 3
+		f.filter.SetWidth(w - 3)
 		body += "\n" + f.filter.View()
 	} else if f.prompt != promptNone {
-		f.promptText.Width = w - lipgloss.Width(promptLabel(f.prompt)) - 2
+		f.promptText.SetWidth(w - lipgloss.Width(promptLabel(f.prompt)) - 2)
 		body += "\n" + f.S.Accent.Render(promptLabel(f.prompt)) + f.promptText.View()
 	}
 	return panel.Render(body, f.S)

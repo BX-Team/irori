@@ -6,16 +6,16 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/bx-team/irori/internal/config"
 	"github.com/bx-team/irori/internal/launch"
 	"github.com/bx-team/irori/internal/models"
 	"github.com/bx-team/irori/internal/props"
 	"github.com/bx-team/irori/internal/ui/components"
 	"github.com/bx-team/irori/internal/ui/msgs"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	zone "github.com/lrstanley/bubblezone"
+	zone "github.com/lrstanley/bubblezone/v2"
 )
 
 const (
@@ -88,19 +88,12 @@ func yesNo(b bool) string {
 }
 
 func NewDashboard(s *components.Styles, cfg *config.Config, scrollback int) *Dashboard {
-	in := textinput.New()
-	in.Prompt = "> "
+	in := s.TextInput("> ", s.Accent)
 	in.Placeholder = "server command"
-	in.PromptStyle = s.Accent
-	in.TextStyle = s.Text
-	in.PlaceholderStyle = s.Dim
 	in.Focus()
 
-	se := textinput.New()
-	se.Prompt = "/ "
+	se := s.TextInput("/ ", s.Warning)
 	se.Placeholder = "filter console"
-	se.PromptStyle = s.Warning
-	se.PlaceholderStyle = s.Dim
 
 	xmx, _ := launch.ParseMemMB(cfg.Java.Xmx)
 	d := &Dashboard{
@@ -128,8 +121,8 @@ func (d *Dashboard) SetSize(w, h int) {
 	d.Base.SetSize(w, h)
 	cw, ch := d.consoleBox()
 	d.console.SetSize(cw.ContentWidth(), ch)
-	d.input.Width = cw.ContentWidth() - 3
-	d.search.Width = cw.ContentWidth() - 3
+	d.input.SetWidth(cw.ContentWidth() - 3)
+	d.search.SetWidth(cw.ContentWidth() - 3)
 }
 
 func (d *Dashboard) sideVisible() bool { return d.Width >= minSideCols }
@@ -191,7 +184,7 @@ func (d *Dashboard) Update(msg tea.Msg) (Screen, tea.Cmd) {
 }
 
 func (d *Dashboard) handleMouse(m tea.MouseMsg) tea.Cmd {
-	if m.Action == tea.MouseActionPress && m.Button == tea.MouseButtonLeft {
+	if components.LeftClick(m) {
 		for _, b := range powerButtons {
 			if zone.Get("pw:" + b.id).InBounds(m) {
 				return d.power(b)

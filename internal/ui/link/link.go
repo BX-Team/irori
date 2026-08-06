@@ -10,9 +10,9 @@ import (
 	"errors"
 	"sync"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/bx-team/irori/internal/ipc"
 	"github.com/bx-team/irori/internal/ui/msgs"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 const inboxSize = 512

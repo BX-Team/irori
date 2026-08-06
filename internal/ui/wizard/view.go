@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
+
+	"charm.land/lipgloss/v2"
 	"github.com/bx-team/irori/internal/ui/components"
-	"github.com/charmbracelet/lipgloss"
-	zone "github.com/lrstanley/bubblezone"
+	zone "github.com/lrstanley/bubblezone/v2"
 )
 
 func (m *Model) listHeight() int {
@@ -100,12 +102,9 @@ func (m *Model) showCandidates() {
 	m.list.SetItems(items)
 }
 
-func (m *Model) View() string {
-	if m.quitting || m.done {
-		return ""
-	}
-	if m.width == 0 {
-		return ""
+func (m *Model) View() tea.View {
+	if m.quitting || m.done || m.width == 0 {
+		return m.view("")
 	}
 
 	width := min(cardWidth, m.width-4)
@@ -123,8 +122,17 @@ func (m *Model) View() string {
 		m.footer(inner),
 	}, "\n")
 
-	return zone.Scan(lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
-		card.Width(width-2).Render(content)))
+	return m.view(zone.Scan(lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
+		card.Width(width).Render(content))))
+}
+
+func (m *Model) view(content string) tea.View {
+	v := tea.NewView(content)
+	v.AltScreen = true
+	if m.mouse {
+		v.MouseMode = tea.MouseModeCellMotion
+	}
+	return v
 }
 
 func (m *Model) header(width int) string {

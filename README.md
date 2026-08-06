@@ -199,7 +199,7 @@ The TUI still works on such a host: run `irori` in the server directory and it a
 
 ## 🔨 Build from source
 
-Go 1.24 or newer, nothing else — the build is CGO-free.
+Go 1.26 or newer, nothing else — the build is CGO-free.
 
 ```bash
 git clone https://github.com/BX-Team/irori.git
@@ -223,5 +223,11 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 - [mcjars.app](https://mcjars.app) — the API behind core, version and build discovery, and the configs a build ships.
 - [Modrinth](https://modrinth.com) — best website with plugin and mod search.
 - [charmbracelet](https://github.com/charmbracelet) — Bubble Tea, Bubbles and Lip Gloss, which the whole UI is built on.
+
+### 🎨 Palettes
 - [Catppuccin](https://github.com/catppuccin/catppuccin) — the Mocha palette.
-- [pterodactyl](https://pterodactyl.io) — the dashboard this borrows its shape from.
+- [gruvbox](https://github.com/morhetz/gruvbox) — the Gruvbox palette.
+- [Rose Pine](https://rosepinetheme.com) — the Rose Pine palette.
+- [kanagawa](https://github.com/rebelot/kanagawa.nvim) — the Kanagawa palette.
+- [tokyonight](https://github.com/folke/tokyonight.nvim) — the Tokyo Night palette.
+- [nord](https://github.com/nordtheme/vim) — the Nord palette.

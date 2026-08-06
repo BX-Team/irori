@@ -1,6 +1,6 @@
 package theme
 
-import "github.com/charmbracelet/lipgloss"
+import "image/color"
 
 // Theme is a set of foregrounds, not a colour scheme for a window. irori never
 // paints a page background — it draws over whatever the terminal already is —
@@ -12,44 +12,44 @@ type Theme struct {
 	// Mantle backs modals, Surface backs the bars, and Crust is the text drawn
 	// on top of an Accent or state-coloured chip. Nothing here covers the whole
 	// screen.
-	Mantle  lipgloss.Color
-	Surface lipgloss.Color
-	Crust   lipgloss.Color
+	Mantle  color.Color
+	Surface color.Color
+	Crust   color.Color
 
-	Text    lipgloss.Color
-	Subtext lipgloss.Color
-	Muted   lipgloss.Color
+	Text    color.Color
+	Subtext color.Color
+	Muted   color.Color
 
-	Border        lipgloss.Color
-	BorderFocused lipgloss.Color
-	Selection     lipgloss.Color
+	Border        color.Color
+	BorderFocused color.Color
+	Selection     color.Color
 
-	Accent    lipgloss.Color
-	Secondary lipgloss.Color
+	Accent    color.Color
+	Secondary color.Color
 
-	Success lipgloss.Color
-	Warning lipgloss.Color
-	Error   lipgloss.Color
-	Info    lipgloss.Color
+	Success color.Color
+	Warning color.Color
+	Error   color.Color
+	Info    color.Color
 
-	Running  lipgloss.Color
-	Starting lipgloss.Color
-	Stopping lipgloss.Color
-	Stopped  lipgloss.Color
-	Crashed  lipgloss.Color
+	Running  color.Color
+	Starting color.Color
+	Stopping color.Color
+	Stopped  color.Color
+	Crashed  color.Color
 
-	LogInfo  lipgloss.Color
-	LogWarn  lipgloss.Color
-	LogError lipgloss.Color
-	LogDebug lipgloss.Color
-	LogTime  lipgloss.Color
-	LogChat  lipgloss.Color
+	LogInfo  color.Color
+	LogWarn  color.Color
+	LogError color.Color
+	LogDebug color.Color
+	LogTime  color.Color
+	LogChat  color.Color
 
-	Dir     lipgloss.Color
-	Jar     lipgloss.Color
-	Archive lipgloss.Color
-	Config  lipgloss.Color
-	Exec    lipgloss.Color
+	Dir     color.Color
+	Jar     color.Color
+	Archive color.Color
+	Config  color.Color
+	Exec    color.Color
 }
 
 var all = []Theme{

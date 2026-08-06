@@ -1,8 +1,11 @@
 package components
 
 import (
+	"image/color"
+
+	"charm.land/bubbles/v2/textinput"
+	"charm.land/lipgloss/v2"
 	"github.com/bx-team/irori/internal/ui/theme"
-	"github.com/charmbracelet/lipgloss"
 )
 
 // Styles is built once per theme and shared by every component; nothing here
@@ -86,7 +89,22 @@ func NewStyles(t theme.Theme) *Styles {
 	}
 }
 
-func (s *Styles) StateColor(label string) lipgloss.Color {
+func (s *Styles) TextInput(prompt string, promptStyle lipgloss.Style) textinput.Model {
+	in := textinput.New()
+	in.Prompt = prompt
+
+	st := in.Styles()
+	for _, state := range []*textinput.StyleState{&st.Focused, &st.Blurred} {
+		state.Prompt = promptStyle
+		state.Placeholder = s.Dim
+		state.Text = s.Text
+	}
+	st.Cursor.Color = s.T.Accent
+	in.SetStyles(st)
+	return in
+}
+
+func (s *Styles) StateColor(label string) color.Color {
 	switch label {
 	case "RUNNING":
 		return s.T.Running

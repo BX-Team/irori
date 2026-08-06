@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/bx-team/irori/internal/config"
 	"github.com/bx-team/irori/internal/java"
 	"github.com/bx-team/irori/internal/launch"
@@ -15,8 +17,6 @@ import (
 	"github.com/bx-team/irori/internal/ui/components"
 	"github.com/bx-team/irori/internal/ui/msgs"
 	"github.com/bx-team/irori/internal/ui/theme"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 const previewRows = 6

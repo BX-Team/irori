@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/bx-team/irori/internal/config"
 	"github.com/bx-team/irori/internal/daemon"
 	"github.com/bx-team/irori/internal/ipc"
@@ -16,9 +18,7 @@ import (
 	"github.com/bx-team/irori/internal/ui/msgs"
 	"github.com/bx-team/irori/internal/ui/screens"
 	"github.com/bx-team/irori/internal/ui/theme"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	zone "github.com/lrstanley/bubblezone"
+	zone "github.com/lrstanley/bubblezone/v2"
 )
 
 const (
@@ -91,7 +91,7 @@ func addonTabLabel(cfg *config.Config) string {
 }
 
 func (a *App) Init() tea.Cmd {
-	cmds := []tea.Cmd{a.link.Connect(), a.link.Wait(), tea.EnterAltScreen}
+	cmds := []tea.Cmd{a.link.Connect(), a.link.Wait()}
 	for _, s := range a.screens {
 		if cmd := s.Init(); cmd != nil {
 			cmds = append(cmds, cmd)
@@ -231,7 +231,7 @@ func (a *App) handleKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (a *App) handleMouse(m tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if a.confirm != nil {
-		if m.Action == tea.MouseActionPress && m.Button == tea.MouseButtonLeft {
+		if components.LeftClick(m) {
 			if zone.Get("modal:yes").InBounds(m) {
 				onYes := a.confirm.OnYes
 				a.confirm = nil
@@ -246,7 +246,7 @@ func (a *App) handleMouse(m tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return a, nil
 	}
 
-	if m.Action == tea.MouseActionPress && m.Button == tea.MouseButtonLeft {
+	if components.LeftClick(m) {
 		for i, t := range a.tabs {
 			if zone.Get("tab:" + t.ID).InBounds(m) {
 				a.active = i
@@ -350,9 +350,9 @@ func (a *App) openEditor(path string) tea.Cmd {
 
 func (a *App) Close() { a.link.Close() }
 
-func (a *App) View() string {
+func (a *App) View() tea.View {
 	if a.width == 0 || a.height == 0 {
-		return ""
+		return a.view("")
 	}
 
 	main := lipgloss.JoinVertical(lipgloss.Left,
@@ -362,7 +362,7 @@ func (a *App) View() string {
 	)
 
 	if a.help {
-		return zone.Scan(components.RenderHelp(a.styles, a.width, a.height, a.helpSections()))
+		return a.view(zone.Scan(components.RenderHelp(a.styles, a.width, a.height, a.helpSections())))
 	}
 	if a.confirm != nil {
 		modal := components.Modal{
@@ -372,10 +372,19 @@ func (a *App) View() string {
 			Danger: a.confirm.Danger,
 		}
 		buttons := components.ConfirmButtons(a.styles, "Yes", "Cancel", a.confirmYes, a.confirm.Danger)
-		return zone.Scan(lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center,
-			modal.Render(a.styles, buttons)))
+		return a.view(zone.Scan(lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center,
+			modal.Render(a.styles, buttons))))
 	}
-	return zone.Scan(main)
+	return a.view(zone.Scan(main))
+}
+
+func (a *App) view(content string) tea.View {
+	v := tea.NewView(content)
+	v.AltScreen = true
+	if a.user.Mouse {
+		v.MouseMode = tea.MouseModeCellMotion
+	}
+	return v
 }
 
 func (a *App) topBar() string {

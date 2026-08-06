@@ -4,15 +4,11 @@ import (
 	"strings"
 	"testing"
 
+	"charm.land/lipgloss/v2"
 	"github.com/bx-team/irori/internal/ui/components"
 	"github.com/bx-team/irori/internal/ui/theme"
-	"github.com/charmbracelet/lipgloss"
 )
 
-// lipgloss.Width() counts padding but not borders, so content sized by eye —
-// or by a style's own Width — overflows a bordered panel by exactly the two
-// border columns. Every panel must render at the width it was asked for, and
-// content of exactly ContentWidth() must be what fits.
 func TestPanelRendersAtItsDeclaredWidth(t *testing.T) {
 	s := components.NewStyles(theme.GetTheme("catppuccin"))
 

@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"os"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/bx-team/irori/internal/config"
 	"github.com/bx-team/irori/internal/ui"
 	"github.com/bx-team/irori/internal/ui/wizard"
-	tea "github.com/charmbracelet/bubbletea"
-	zone "github.com/lrstanley/bubblezone"
+	zone "github.com/lrstanley/bubblezone/v2"
 	"github.com/spf13/cobra"
 )
 
@@ -34,11 +34,7 @@ func runApp(cfg *config.Config) error {
 	app := ui.New(cfg, user)
 	defer app.Close()
 
-	opts := []tea.ProgramOption{tea.WithAltScreen()}
-	if user.Mouse {
-		opts = append(opts, tea.WithMouseCellMotion())
-	}
-	_, err := tea.NewProgram(app, opts...).Run()
+	_, err := tea.NewProgram(app).Run()
 	return err
 }
 

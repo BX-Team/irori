@@ -1,9 +1,9 @@
 package screens
 
 import (
+	tea "charm.land/bubbletea/v2"
 	"github.com/bx-team/irori/internal/models"
 	"github.com/bx-team/irori/internal/ui/msgs"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 func toast(text string, level models.LogLevel) tea.Cmd {

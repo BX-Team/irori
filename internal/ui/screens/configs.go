@@ -6,6 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/bx-team/irori/internal/confdiff"
 	"github.com/bx-team/irori/internal/config"
 	"github.com/bx-team/irori/internal/confs"
@@ -15,9 +18,6 @@ import (
 	"github.com/bx-team/irori/internal/props"
 	"github.com/bx-team/irori/internal/ui/components"
 	"github.com/bx-team/irori/internal/ui/msgs"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 const (
@@ -85,12 +85,8 @@ type Configs struct {
 }
 
 func NewConfigs(s *components.Styles, cfg *config.Config) *Configs {
-	fl := textinput.New()
-	fl.Prompt = "/ "
+	fl := s.TextInput("/ ", s.Warning)
 	fl.Placeholder = "filter keys"
-	fl.PromptStyle = s.Warning
-	fl.PlaceholderStyle = s.Dim
-	fl.TextStyle = s.Text
 
 	c := &Configs{
 		cfg:    cfg,
@@ -758,7 +754,7 @@ func (c *Configs) fieldsView(panel components.Panel, wide bool) string {
 
 func (c *Configs) header(width int) string {
 	if c.filtering {
-		c.filter.Width = width - 3
+		c.filter.SetWidth(width - 3)
 		return c.filter.View()
 	}
 

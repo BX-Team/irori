@@ -3,9 +3,9 @@ package components
 import (
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	zone "github.com/lrstanley/bubblezone"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	zone "github.com/lrstanley/bubblezone/v2"
 )
 
 type ListItem struct {
@@ -164,11 +164,11 @@ func (l *List) Update(msg tea.Msg) tea.Cmd {
 		}
 	case tea.MouseMsg:
 		switch {
-		case m.Button == tea.MouseButtonWheelUp:
+		case WheelUp(m):
 			l.Move(-1)
-		case m.Button == tea.MouseButtonWheelDown:
+		case WheelDown(m):
 			l.Move(1)
-		case m.Action == tea.MouseActionPress && m.Button == tea.MouseButtonLeft && l.ZonePfx != "":
+		case LeftClick(m) && l.ZonePfx != "":
 			for i := range l.visible {
 				if zone.Get(l.ZonePfx + l.items[l.visible[i]].ID).InBounds(m) {
 					l.cursor = i

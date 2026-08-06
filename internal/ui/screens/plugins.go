@@ -7,6 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/bx-team/irori/internal/config"
 	"github.com/bx-team/irori/internal/host"
 	"github.com/bx-team/irori/internal/install"
@@ -16,9 +19,6 @@ import (
 	"github.com/bx-team/irori/internal/plugins"
 	"github.com/bx-team/irori/internal/ui/components"
 	"github.com/bx-team/irori/internal/ui/msgs"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 const (
@@ -91,12 +91,8 @@ type Plugins struct {
 }
 
 func NewPlugins(s *components.Styles, cfg *config.Config) *Plugins {
-	in := textinput.New()
-	in.Prompt = "🔎 "
+	in := s.TextInput("🔎 ", s.Accent)
 	in.Placeholder = "search Modrinth"
-	in.PromptStyle = s.Accent
-	in.PlaceholderStyle = s.Dim
-	in.TextStyle = s.Text
 
 	p := &Plugins{
 		cfg:       cfg,
@@ -726,7 +722,7 @@ func (p *Plugins) browsePanel(width int) string {
 	}
 
 	w, h := panel.ContentWidth(), panel.ContentHeight()
-	p.search.Width = w - 4
+	p.search.SetWidth(w - 4)
 	head := p.search.View()
 	if p.busy != "" {
 		head = p.S.Accent.Render(p.busy)

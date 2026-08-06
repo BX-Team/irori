@@ -1,8 +1,8 @@
 package msgs
 
 import (
+	tea "charm.land/bubbletea/v2"
 	"github.com/bx-team/irori/internal/models"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 type LogMsg struct{ Line models.LogLine }

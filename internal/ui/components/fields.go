@@ -5,10 +5,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	zone "github.com/lrstanley/bubblezone"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	zone "github.com/lrstanley/bubblezone/v2"
 )
 
 type FieldKind int
@@ -69,11 +69,7 @@ type Fields struct {
 }
 
 func NewFields(s *Styles) *Fields {
-	in := textinput.New()
-	in.Prompt = ""
-	in.TextStyle = s.Text
-	in.Cursor.Style = s.Cursor
-	return &Fields{s: s, input: in, Empty: "nothing found"}
+	return &Fields{s: s, input: s.TextInput("", s.Text), Empty: "nothing found"}
 }
 
 func (f *Fields) SetFields(fields []Field) {
@@ -277,11 +273,11 @@ func (f *Fields) Update(msg tea.Msg) (tea.Cmd, bool) {
 
 	case tea.MouseMsg:
 		switch {
-		case m.Button == tea.MouseButtonWheelUp:
+		case WheelUp(m):
 			f.move(-1)
-		case m.Button == tea.MouseButtonWheelDown:
+		case WheelDown(m):
 			f.move(1)
-		case m.Action == tea.MouseActionPress && m.Button == tea.MouseButtonLeft && f.ZonePfx != "":
+		case LeftClick(m) && f.ZonePfx != "":
 			for i, r := range f.rows {
 				if r.idx < 0 {
 					continue
@@ -358,7 +354,7 @@ func (f *Fields) beginEdit(fl Field) {
 	f.editing, f.err = true, ""
 	f.input.SetValue(fl.Value)
 	f.input.CursorEnd()
-	f.input.Width = f.valueWidth() - 1
+	f.input.SetWidth(f.valueWidth() - 1)
 	f.input.Focus()
 }
 

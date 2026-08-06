@@ -1,6 +1,6 @@
 package theme
 
-import "github.com/charmbracelet/lipgloss"
+import "charm.land/lipgloss/v2"
 
 // Catppuccin is the Mocha flavour. The other three are deliberately not here:
 // what separates them is the background ramp, which irori never paints, and

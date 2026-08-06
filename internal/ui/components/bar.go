@@ -1,9 +1,10 @@
 package components
 
 import (
+	"image/color"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -31,13 +32,13 @@ func Bar(left, right string, width int, s *Styles) string {
 		Foreground(s.T.Text).
 		Padding(0, 1)
 
-	// lipgloss counts padding inside Width() but adds borders outside it, so the
-	// declared width must exclude only the border.
+	// Width() is the whole box in lipgloss v2, border included; the frame size
+	// is what has to come off for the text laid out inside it.
 	inner := width - style.GetHorizontalFrameSize()
 	if inner < 1 {
 		inner = 1
 	}
-	return style.Width(width - 2).Render(SpaceBetween(left, right, inner))
+	return style.Width(width).Render(SpaceBetween(left, right, inner))
 }
 
 type Hint struct {
@@ -53,6 +54,6 @@ func Hints(s *Styles, hints ...Hint) string {
 	return strings.Join(parts, s.Sep.Render(" │ "))
 }
 
-func Dot(s *Styles, color lipgloss.Color) string {
-	return lipgloss.NewStyle().Foreground(color).Render("●")
+func Dot(s *Styles, c color.Color) string {
+	return lipgloss.NewStyle().Foreground(c).Render("●")
 }

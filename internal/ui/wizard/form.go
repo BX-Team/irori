@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
 	"github.com/bx-team/irori/internal/launch"
 	"github.com/bx-team/irori/internal/ui/components"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 var formLabels = []string{"Server name", "Initial heap (Xms)", "Maximum heap (Xmx)"}
@@ -18,13 +18,10 @@ func (m *Model) buildForm() {
 
 	m.fields = make([]textinput.Model, len(values))
 	for i := range m.fields {
-		in := textinput.New()
-		in.Prompt = ""
+		in := m.s.TextInput("", m.s.Text)
 		in.SetValue(values[i])
 		in.Placeholder = placeholders[i]
-		in.TextStyle = m.s.Text
-		in.PlaceholderStyle = m.s.Dim
-		in.Width = 24
+		in.SetWidth(24)
 		m.fields[i] = in
 	}
 	m.field = 0
