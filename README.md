@@ -11,7 +11,7 @@ A terminal UI for running a Minecraft server. One binary, no web panel, no tmux 
 
 </div>
 
-# 🖼️ Preview
+## 🖼️ Preview
 
 Every config file the core ships, flattened to dotted keys, documented by its own comments:
 
@@ -25,7 +25,7 @@ Heap, GC preset and the detected JDK — with the exact command line they add up
 
 ![settings](.github/branding/settings.png)
 
-# 🔥 Why
+## 🔥 Why
 
 The server process belongs to a small detached daemon, not to your terminal. Start the server, close the TUI, log out of SSH — it keeps running, and `irori` reattaches to the same console the next time you open it. `irori start` / `stop` / `status` / `cmd` do the same thing from a script.
 
@@ -36,9 +36,9 @@ The server process belongs to a small detached daemon, not to your terminal. Sta
 - **Declarative** — keys you pin in `.irori.json` are re-applied by `irori apply`, together with the core and plugin set. `irori config import` fills them in for you by diffing the directory against the configs the core ships.
 - **Java** — the right JDK is found and version-checked before a start, instead of after a crash.
 
-# 📦 Installation
+## 📦 Installation
 
-## Linux, macOS, BSD
+### Linux, macOS, BSD
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/BX-Team/irori/master/installer/install.sh | sh
@@ -50,7 +50,7 @@ Installs to `/usr/local/bin` as root, `~/.local/bin` otherwise. Options:
 curl -fsSL https://raw.githubusercontent.com/BX-Team/irori/master/installer/install.sh | sh -s -- --version 1.2.3 --bin-dir ~/bin
 ```
 
-## Windows
+### Windows
 
 In **PowerShell** — not `cmd.exe`; Windows Terminal, PowerShell 5.1 and PowerShell 7 all work, and no administrator rights are needed:
 
@@ -64,19 +64,19 @@ Installs to `%LOCALAPPDATA%\Programs\irori` and adds it to your user `PATH`, so 
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/BX-Team/irori/master/installer/install.ps1))) -Version 1.2.3
 ```
 
-## Manual download
+### Manual download
 
 Grab an archive from the [Releases page](https://github.com/BX-Team/irori/releases/latest) — `irori-<os>-<arch>.tar.gz`, or `.zip` on Windows — unpack it and put `irori` on your `PATH`. Every asset ships a `.sha256` next to it.
 
 Builds are published for Linux (`amd64`, `arm64`, `armv7`, `riscv64`), macOS (`amd64`, `arm64`), Windows (`amd64`, `arm64`) and FreeBSD (`amd64`).
 
-## Go
+### Go
 
 ```bash
 go install github.com/bx-team/irori/cmd/irori@latest
 ```
 
-## Nix
+### Nix
 
 irori ships a flake. Run it without installing:
 
@@ -124,7 +124,7 @@ nix = {
 };
 ```
 
-# 🚀 Getting started
+## 🚀 Getting started
 
 ```bash
 mkdir survival && cd survival
@@ -133,7 +133,7 @@ irori
 
 An empty directory opens the wizard: pick a core (Paper, Purpur, Fabric, Velocity, …) and a version, set the heap, accept the EULA. irori writes `.irori.json`, downloads the build and drops you at the console. Point it at a directory that already holds a server and it reads the existing start script instead.
 
-## Commands
+### Commands
 
 | Command | What it does |
 | ------- | ------------ |
@@ -150,7 +150,7 @@ An empty directory opens the wizard: pick a core (Paper, Purpur, Fabric, Velocit
 
 `-C, --dir` points any of them at another directory.
 
-# ❄️ NixOS
+## ❄️ NixOS
 
 Downloading a jar at runtime is wrong on NixOS, so the flake exposes a module that runs the daemon as a systemd unit and builds the server's artifacts into the store instead.
 
@@ -197,7 +197,7 @@ Each server becomes an `irori-<name>.service`. `systemctl stop` walks the server
 
 The TUI still works on such a host: run `irori` in the server directory and it attaches to the unit's daemon like any other.
 
-# 🔨 Build from source
+## 🔨 Build from source
 
 Go 1.24 or newer, nothing else — the build is CGO-free.
 
@@ -210,18 +210,18 @@ go run ./cmd/irori
 
 Or use the flake: `nix develop` gives you Go, gopls and golangci-lint.
 
-# 🤝 Contributing
+## 🤝 Contributing
 
 Issues and pull requests are welcome. Before opening one, run what CI runs: `gofmt -l $(git ls-files '*.go')`, `go vet ./...`, `go test ./...` and `golangci-lint run`. Tests live in `test/`, one per trap worth guarding rather than one per function.
 
-# ⚖️ License
+## ⚖️ License
 
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
 
-# 💛 Credits
+## 💛 Credits
 
 - [mcjars.app](https://mcjars.app) — the API behind core, version and build discovery, and the configs a build ships.
-- [Modrinth](https://modrinth.com) — plugin and mod search and downloads.
+- [Modrinth](https://modrinth.com) — best website with plugin and mod search.
 - [charmbracelet](https://github.com/charmbracelet) — Bubble Tea, Bubbles and Lip Gloss, which the whole UI is built on.
 - [Catppuccin](https://github.com/catppuccin/catppuccin) — the Mocha palette.
 - [pterodactyl](https://pterodactyl.io) — the dashboard this borrows its shape from.
