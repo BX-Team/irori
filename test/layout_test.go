@@ -14,7 +14,7 @@ import (
 // border columns. Every panel must render at the width it was asked for, and
 // content of exactly ContentWidth() must be what fits.
 func TestPanelRendersAtItsDeclaredWidth(t *testing.T) {
-	s := components.NewStyles(theme.GetTheme("catppuccin-mocha"))
+	s := components.NewStyles(theme.GetTheme("catppuccin"))
 
 	for _, width := range []int{20, 33, 40, 80, 120} {
 		p := components.Panel{Title: "Console", Width: width, Height: 6}
@@ -38,7 +38,7 @@ func TestPanelRendersAtItsDeclaredWidth(t *testing.T) {
 // The badge shares the top border with the title; a long pair must still not
 // push the border wider than the panel.
 func TestPanelTitleAndBadgeDoNotWidenTheBorder(t *testing.T) {
-	s := components.NewStyles(theme.GetTheme("catppuccin-mocha"))
+	s := components.NewStyles(theme.GetTheme("catppuccin"))
 	p := components.Panel{
 		Title:  "a very long panel title that will not fit",
 		Badge:  "1234/5678 items",

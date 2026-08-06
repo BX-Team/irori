@@ -42,6 +42,7 @@ type Styles struct {
 	Label lipgloss.Style
 	Value lipgloss.Style
 	Dim   lipgloss.Style
+	Time  lipgloss.Style
 }
 
 func NewStyles(t theme.Theme) *Styles {
@@ -81,6 +82,7 @@ func NewStyles(t theme.Theme) *Styles {
 		Label: base.Foreground(t.Muted),
 		Value: base.Foreground(t.Text),
 		Dim:   base.Foreground(t.Muted),
+		Time:  base.Foreground(t.LogTime),
 	}
 }
 

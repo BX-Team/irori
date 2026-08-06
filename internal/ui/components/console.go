@@ -127,7 +127,7 @@ func (c *Console) render(l models.LogLine) []string {
 	out := make([]string, 0, len(wrapped))
 	for i, row := range wrapped {
 		if i == 0 && prefix != "" && len(row) >= len(prefix) {
-			out = append(out, c.s.Dim.Render(row[:len(prefix)])+body.Render(row[len(prefix):]))
+			out = append(out, c.s.Time.Render(row[:len(prefix)])+body.Render(row[len(prefix):]))
 			continue
 		}
 		out = append(out, body.Render(row))

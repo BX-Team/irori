@@ -2,15 +2,17 @@ package theme
 
 import "github.com/charmbracelet/lipgloss"
 
-func CatppuccinMocha() Theme {
+// Catppuccin is the Mocha flavour. The other three are deliberately not here:
+// what separates them is the background ramp, which irori never paints, and
+// their foregrounds sit within 36/255 per channel of these — on screen they
+// render as the same theme.
+func Catppuccin() Theme {
 	return Theme{
-		Name: "catppuccin-mocha",
+		Name: "catppuccin",
 
-		Base:    lipgloss.Color("#1e1e2e"),
 		Mantle:  lipgloss.Color("#181825"),
-		Crust:   lipgloss.Color("#11111b"),
 		Surface: lipgloss.Color("#313244"),
-		Overlay: lipgloss.Color("#6c7086"),
+		Crust:   lipgloss.Color("#11111b"),
 
 		Text:    lipgloss.Color("#cdd6f4"),
 		Subtext: lipgloss.Color("#a6adc8"),
@@ -46,52 +48,5 @@ func CatppuccinMocha() Theme {
 		Archive: lipgloss.Color("#cba6f7"),
 		Config:  lipgloss.Color("#a6e3a1"),
 		Exec:    lipgloss.Color("#f38ba8"),
-	}
-}
-
-func CatppuccinLatte() Theme {
-	return Theme{
-		Name: "catppuccin-latte",
-
-		Base:    lipgloss.Color("#eff1f5"),
-		Mantle:  lipgloss.Color("#e6e9ef"),
-		Crust:   lipgloss.Color("#dce0e8"),
-		Surface: lipgloss.Color("#ccd0da"),
-		Overlay: lipgloss.Color("#9ca0b0"),
-
-		Text:    lipgloss.Color("#4c4f69"),
-		Subtext: lipgloss.Color("#6c6f85"),
-		Muted:   lipgloss.Color("#9ca0b0"),
-
-		Border:        lipgloss.Color("#bcc0cc"),
-		BorderFocused: lipgloss.Color("#1e66f5"),
-		Selection:     lipgloss.Color("#ccd0da"),
-
-		Accent:    lipgloss.Color("#1e66f5"),
-		Secondary: lipgloss.Color("#8839ef"),
-
-		Success: lipgloss.Color("#40a02b"),
-		Warning: lipgloss.Color("#df8e1d"),
-		Error:   lipgloss.Color("#d20f39"),
-		Info:    lipgloss.Color("#04a5e5"),
-
-		Running:  lipgloss.Color("#40a02b"),
-		Starting: lipgloss.Color("#df8e1d"),
-		Stopping: lipgloss.Color("#fe640b"),
-		Stopped:  lipgloss.Color("#9ca0b0"),
-		Crashed:  lipgloss.Color("#d20f39"),
-
-		LogInfo:  lipgloss.Color("#4c4f69"),
-		LogWarn:  lipgloss.Color("#df8e1d"),
-		LogError: lipgloss.Color("#d20f39"),
-		LogDebug: lipgloss.Color("#9ca0b0"),
-		LogTime:  lipgloss.Color("#acb0be"),
-		LogChat:  lipgloss.Color("#179299"),
-
-		Dir:     lipgloss.Color("#1e66f5"),
-		Jar:     lipgloss.Color("#fe640b"),
-		Archive: lipgloss.Color("#8839ef"),
-		Config:  lipgloss.Color("#40a02b"),
-		Exec:    lipgloss.Color("#d20f39"),
 	}
 }

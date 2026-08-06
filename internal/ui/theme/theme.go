@@ -2,14 +2,19 @@ package theme
 
 import "github.com/charmbracelet/lipgloss"
 
+// Theme is a set of foregrounds, not a colour scheme for a window. irori never
+// paints a page background — it draws over whatever the terminal already is —
+// which is why every palette here is a dark one: a light palette would be
+// unreadable in anything but a light terminal.
 type Theme struct {
 	Name string
 
-	Base    lipgloss.Color
+	// Mantle backs modals, Surface backs the bars, and Crust is the text drawn
+	// on top of an Accent or state-coloured chip. Nothing here covers the whole
+	// screen.
 	Mantle  lipgloss.Color
-	Crust   lipgloss.Color
 	Surface lipgloss.Color
-	Overlay lipgloss.Color
+	Crust   lipgloss.Color
 
 	Text    lipgloss.Color
 	Subtext lipgloss.Color
@@ -47,13 +52,30 @@ type Theme struct {
 	Exec    lipgloss.Color
 }
 
-func Names() []string { return []string{"catppuccin-mocha", "catppuccin-latte"} }
+var all = []Theme{
+	Catppuccin(),
+	TokyoNight(),
+	Kanagawa(),
+	GruvboxDark(),
+	RosePineMoon(),
+	Nord(),
+}
 
-func GetTheme(name string) Theme {
-	switch name {
-	case "catppuccin-latte", "latte":
-		return CatppuccinLatte()
-	default:
-		return CatppuccinMocha()
+func Names() []string {
+	out := make([]string, len(all))
+	for i, t := range all {
+		out[i] = t.Name
 	}
+	return out
+}
+
+// GetTheme falls back to the default rather than erroring: a user config still
+// naming a theme that has since been dropped should not stop the TUI opening.
+func GetTheme(name string) Theme {
+	for _, t := range all {
+		if t.Name == name {
+			return t
+		}
+	}
+	return all[0]
 }

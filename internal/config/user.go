@@ -15,7 +15,7 @@ type User struct {
 
 func DefaultUser() *User {
 	return &User{
-		Theme:        "catppuccin-mocha",
+		Theme:        "catppuccin",
 		Mouse:        true,
 		ConsoleLines: 5000,
 	}
@@ -34,7 +34,7 @@ func LoadUser() *User {
 		u.ConsoleLines = 5000
 	}
 	if u.Theme == "" {
-		u.Theme = "catppuccin-mocha"
+		u.Theme = "catppuccin"
 	}
 	return u
 }

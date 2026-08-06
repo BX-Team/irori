@@ -68,7 +68,8 @@ CI runs gofmt, `go vet`, `go test`, golangci-lint and a cross-compile matrix —
 ### Style
 - gofmt is the source of truth — never hand-format against it.
 - Match the surrounding code. Screens are Bubble Tea models with `Update`/`View`; follow the idiom already in the file you're editing.
-- Colors come from `internal/ui/theme` (Catppuccin Mocha). Never hardcode a color outside `theme/`.
+- Colors come from `internal/ui/theme` (default Catppuccin Mocha; add a palette by appending one entry to `all`). Never hardcode a color outside `theme/`.
+- **Themes are foregrounds only.** irori never paints a page background — it draws over whatever the terminal already is. `Mantle` backs modals, `Surface` the bars, `Crust` is the text on an accent chip; nothing covers the screen. Two consequences, both already paid for: **no light palettes** (Latte was unreadable on a dark terminal), and **no near-identical siblings** — Catppuccin's four flavours differ mainly in the background ramp, so on screen only Mocha's foregrounds survive and it ships alone as `catppuccin`.
 - All filesystem access goes through `host.Backend`, not `os` directly — that indirection is what keeps a remote backend possible.
 - All config writes go through `internal/overrides`. Writing a properties or yml file by hand loses the comments.
 
