@@ -79,8 +79,9 @@ type Configs struct {
 	filtering bool
 	pane      configPane
 
-	running bool
-	err     string
+	running   bool
+	lastState models.ServerState
+	err       string
 }
 
 func NewConfigs(s *components.Styles, cfg *config.Config) *Configs {
@@ -265,6 +266,28 @@ func (c *Configs) reload() {
 	c.select_(rel)
 }
 
+func (c *Configs) rescan() {
+	c.stash()
+	was := c.current
+	for path, od := range c.open {
+		if len(od.changed()) == 0 {
+			delete(c.open, path)
+		}
+	}
+
+	c.current = ""
+	c.discover()
+	if was == "" || was == c.current {
+		return
+	}
+	for _, it := range c.files.Items() {
+		if it.ID == was {
+			c.select_(was)
+			return
+		}
+	}
+}
+
 func (c *Configs) markDirty() {
 	fields := c.fields.All()
 	od, ok := c.doc()
@@ -283,6 +306,10 @@ func (c *Configs) Update(msg tea.Msg) (Screen, tea.Cmd) {
 	switch m := msg.(type) {
 	case msgs.StatusMsg:
 		c.running = m.Status.State.IsUp()
+		if m.Status.State != c.lastState {
+			c.lastState = m.Status.State
+			c.rescan()
+		}
 		return c, nil
 
 	case msgs.ConfigChangedMsg:
@@ -375,9 +402,13 @@ func (c *Configs) handleKey(k tea.KeyMsg) (Screen, tea.Cmd) {
 }
 
 func (c *Configs) handleFileKey(k tea.KeyMsg) (Screen, tea.Cmd) {
-	if k.String() == "enter" {
+	switch k.String() {
+	case "enter":
 		c.pane = paneEntries
 		return c, nil
+	case "R":
+		c.rescan()
+		return c, toast("rescanned", models.LevelIrori)
 	}
 	cmd := c.files.Update(k)
 	if sel, ok := c.files.Selected(); ok {
@@ -397,6 +428,9 @@ func (c *Configs) handleEntryKey(k tea.KeyMsg) (Screen, tea.Cmd) {
 	case "r":
 		c.reload()
 		return c, toast("reloaded "+c.current, models.LevelIrori)
+	case "R":
+		c.rescan()
+		return c, toast("rescanned", models.LevelIrori)
 	case "D":
 		return c, c.resetToDefault()
 	case "u":
@@ -622,6 +656,7 @@ func (c *Configs) Hints() []components.Hint {
 		{Key: "Enter", Desc: "edit"},
 		{Key: "Ctrl+S", Desc: "save"},
 		{Key: "c/C", Desc: "declare key/all"},
+		{Key: "r/R", Desc: "reload rescan"},
 		{Key: "u", Desc: "undo"},
 		{Key: "e", Desc: "$EDITOR"},
 		{Key: "/", Desc: "filter"},

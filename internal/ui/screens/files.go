@@ -56,10 +56,11 @@ type Files struct {
 	cfg *config.Config
 	br  *files.Browser
 
-	entries []host.Entry
-	cursor  int
-	offset  int
-	lastAt  map[string]string
+	entries   []host.Entry
+	cursor    int
+	offset    int
+	lastAt    map[string]string
+	lastState models.ServerState
 
 	parent       []host.Entry
 	parentCursor int
@@ -285,6 +286,14 @@ func (f *Files) Update(msg tea.Msg) (Screen, tea.Cmd) {
 		return f, nil
 
 	case msgs.ConfigChangedMsg:
+		f.reload(f.br.Dir())
+		return f, f.refreshPreview()
+
+	case msgs.StatusMsg:
+		if m.Status.State == f.lastState {
+			return f, nil
+		}
+		f.lastState = m.Status.State
 		f.reload(f.br.Dir())
 		return f, f.refreshPreview()
 
@@ -616,7 +625,8 @@ func (f *Files) Hints() []components.Hint {
 		{Key: "y x p", Desc: "copy cut paste"},
 		{Key: "d", Desc: "delete"},
 		{Key: "a A r", Desc: "file dir rename"},
-		{Key: "D", Desc: "restore default"},
+		{Key: "D", Desc: "defaults"},
+		{Key: "R", Desc: "reload"},
 		{Key: "/", Desc: "filter"},
 	}
 	if !f.br.Clip.Empty() {

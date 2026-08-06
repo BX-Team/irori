@@ -79,6 +79,7 @@ CI runs gofmt, `go vet`, `go test`, golangci-lint and a cross-compile matrix —
 ### TUI gotchas
 - `lipgloss.Width()` counts padding but **not** borders. A panel that fits by that measurement still overflows by 2 columns once it is bordered — subtract the border yourself when sizing.
 - Key events go to the **focused tab only**; state updates broadcast to every screen. Never route a key by scanning all screens.
+- A screen that lists the server directory must **rebuild itself on a `StatusMsg` state change**, not just at construction: the core writes most of the directory the first time it runs, so Files, Configs and Plugins were built against a directory that no longer exists. Compare against a stored `lastState` — `StatusMsg` also arrives without a transition. A rescan re-reads from disk, so it must skip documents with unsaved edits.
 - Mouse zones come from bubblezone; a clickable region must be wrapped in a zone with a stable id or the hit test silently does nothing.
 
 ### Testing

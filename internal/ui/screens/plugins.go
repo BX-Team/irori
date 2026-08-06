@@ -83,10 +83,11 @@ type Plugins struct {
 	anyVersion bool
 	query      string
 
-	project modrinth.SearchResult
-	busy    string
-	note    string
-	total   int
+	project   modrinth.SearchResult
+	busy      string
+	note      string
+	total     int
+	lastState models.ServerState
 }
 
 func NewPlugins(s *components.Styles, cfg *config.Config) *Plugins {
@@ -355,6 +356,13 @@ func (p *Plugins) Update(msg tea.Msg) (Screen, tea.Cmd) {
 		return p, nil
 
 	case msgs.ConfigChangedMsg:
+		return p, p.rescan()
+
+	case msgs.StatusMsg:
+		if m.Status.State == p.lastState {
+			return p, nil
+		}
+		p.lastState = m.Status.State
 		return p, p.rescan()
 
 	case searchDoneMsg:
