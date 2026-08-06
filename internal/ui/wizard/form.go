@@ -98,8 +98,8 @@ func (m *Model) showPresets() {
 	items := make([]components.ListItem, 0, 4)
 	for _, p := range launch.Presets() {
 		badge := ""
-		if n := len(p.Flags(xmxMB)); n > 0 {
-			badge = fmt.Sprintf("%d flags", n)
+		if n := len(p.AllFlags(xmxMB)); n > 0 {
+			badge = fmt.Sprintf("up to %d flags", n)
 		}
 		items = append(items, components.ListItem{
 			ID: p.ID, Title: p.Name, Desc: p.Summary, Badge: badge,

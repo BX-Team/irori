@@ -575,18 +575,18 @@ func (s *Settings) preview() (string, int) {
 	draft.Java.Preset = s.value("java.preset")
 	draft.Java.ExtraFlags = strings.Fields(s.value("java.extraFlags"))
 
-	javaPath := s.value("java.path")
-	if javaPath == "" {
-		javaPath = s.jdk.Path
+	jdk := s.jdk
+	if p := s.value("java.path"); p != "" {
+		jdk.Path = p
 	}
-	if javaPath == "" {
-		javaPath = "java"
+	if jdk.Path == "" {
+		jdk.Path = "java"
 	}
 
 	panel := components.Panel{Title: "launch command", Width: s.Width}
 
 	var lines []string
-	spec, err := launch.Build(&draft, javaPath)
+	spec, err := launch.Build(&draft, jdk)
 	if err != nil {
 		lines = []string{s.S.Error.Render(components.Truncate(err.Error(), panel.ContentWidth()))}
 	} else {

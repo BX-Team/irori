@@ -20,7 +20,16 @@ type JDK struct {
 	Version string `json:"version"`
 	Vendor  string `json:"vendor"`
 	Source  string `json:"source"`
+	Graal   Graal  `json:"graal,omitempty"`
 }
+
+type Graal string
+
+const (
+	GraalNone      Graal = ""
+	GraalCommunity Graal = "community"
+	GraalOracle    Graal = "oracle"
+)
 
 func (j JDK) Display() string {
 	if j.Path == "" {
@@ -231,18 +240,23 @@ func Probe(ctx context.Context, path string) (JDK, error) {
 	}
 
 	jdk := JDK{Path: path}
+	var brand []string
 	for _, m := range propRe.FindAllStringSubmatch(string(out), -1) {
+		v := strings.TrimSpace(m[2])
 		switch m[1] {
 		case "java.version":
-			jdk.Version = strings.TrimSpace(m[2])
+			jdk.Version = v
 		case "java.vendor":
-			jdk.Vendor = strings.TrimSpace(m[2])
+			jdk.Vendor = v
 		case "java.specification.version":
 			if jdk.Major == 0 {
-				jdk.Major = MajorOf(strings.TrimSpace(m[2]))
+				jdk.Major = MajorOf(v)
 			}
+		case "java.vendor.version", "java.vm.name", "java.vm.version", "java.runtime.name":
+			brand = append(brand, v)
 		}
 	}
+	jdk.Graal = classifyGraal(brand)
 	if jdk.Version != "" {
 		jdk.Major = MajorOf(jdk.Version)
 	}
@@ -250,6 +264,17 @@ func Probe(ctx context.Context, path string) (JDK, error) {
 		return JDK{}, fmt.Errorf("could not determine java version at %s", path)
 	}
 	return jdk, nil
+}
+
+func classifyGraal(brand []string) Graal {
+	s := strings.ToLower(strings.Join(brand, " "))
+	if !strings.Contains(s, "graalvm") {
+		return GraalNone
+	}
+	if strings.Contains(s, "oracle graalvm") || strings.Contains(s, "graalvm ee") {
+		return GraalOracle
+	}
+	return GraalCommunity
 }
 
 func MajorOf(v string) int {

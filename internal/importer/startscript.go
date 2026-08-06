@@ -121,32 +121,35 @@ func detectPreset(flags []string, xmx string) string {
 	if err != nil {
 		heapMB = 4096
 	}
+	have := make(map[string]bool, len(flags))
+	for _, f := range flags {
+		have[f] = true
+	}
+
+	best, bestScore := "none", 0.0
 	for _, p := range launch.Presets() {
 		if p.ID == "none" {
 			continue
 		}
-		if sameFlags(flags, p.Flags(heapMB)) {
-			return p.ID
+		known := p.AllFlags(heapMB)
+		hit := 0
+		for _, f := range known {
+			if have[f] {
+				hit++
+			}
+		}
+		// Penalise the flags the preset is missing and the ones the
+		// script has on top of it alike, so a small preset cannot win just by
+		// being a subset of a big one.
+		score := float64(hit) / float64(len(have)+len(known)-hit)
+		if score > bestScore {
+			best, bestScore = p.ID, score
 		}
 	}
-	return "none"
-}
-
-func sameFlags(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
+	if bestScore < 0.5 {
+		return "none"
 	}
-	set := make(map[string]int, len(b))
-	for _, f := range b {
-		set[f]++
-	}
-	for _, f := range a {
-		set[f]--
-		if set[f] < 0 {
-			return false
-		}
-	}
-	return true
+	return best
 }
 
 func tokenize(line string) []string {
@@ -189,7 +192,7 @@ func StripPresetFlags(flags []string, preset, xmx string) []string {
 		heapMB = 4096
 	}
 	known := map[string]bool{}
-	for _, f := range launch.GetPreset(preset).Flags(heapMB) {
+	for _, f := range launch.GetPreset(preset).AllFlags(heapMB) {
 		known[f] = true
 	}
 	out := flags[:0:0]

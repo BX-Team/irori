@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/bx-team/irori/internal/config"
+	"github.com/bx-team/irori/internal/java"
 )
 
 type Spec struct {
@@ -13,9 +14,7 @@ type Spec struct {
 	Dir  string
 }
 
-// Build renders the full java command line from a config. It does not resolve
-// the java binary; pass the already-resolved path.
-func Build(cfg *config.Config, javaPath string) (Spec, error) {
+func Build(cfg *config.Config, jdk java.JDK) (Spec, error) {
 	xmxMB, err := ParseMemMB(cfg.Java.Xmx)
 	if err != nil {
 		return Spec{}, fmt.Errorf("xmx: %w", err)
@@ -29,12 +28,12 @@ func Build(cfg *config.Config, javaPath string) (Spec, error) {
 	}
 
 	args := []string{"-Xms" + FormatMemMB(xmsMB), "-Xmx" + FormatMemMB(xmxMB)}
-	args = append(args, GetPreset(cfg.Java.Preset).Flags(xmxMB)...)
+	args = append(args, GetPreset(cfg.Java.Preset).Flags(EnvFor(jdk, xmxMB))...)
 	args = append(args, cfg.Java.ExtraFlags...)
 	args = append(args, "-jar", cfg.Server.Jar)
 	args = append(args, serverArgs(cfg)...)
 
-	return Spec{Java: javaPath, Args: args, Dir: cfg.Dir()}, nil
+	return Spec{Java: jdk.Path, Args: args, Dir: cfg.Dir()}, nil
 }
 
 func serverArgs(cfg *config.Config) []string {

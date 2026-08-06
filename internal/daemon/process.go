@@ -67,7 +67,7 @@ func (d *Daemon) doStart() error {
 		d.note("warning: this server needs Java %d or newer", required)
 	}
 
-	spec, err := launch.Build(d.cfg, jdk.Path)
+	spec, err := launch.Build(d.cfg, jdk)
 	if err != nil {
 		d.note("could not build command line: %v", err)
 		return err
