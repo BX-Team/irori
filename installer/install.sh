@@ -62,7 +62,6 @@ target() {
 	x86_64 | amd64) arch=amd64 ;;
 	aarch64 | arm64) arch=arm64 ;;
 	armv7* | armv6* | armhf) arch=arm-v7 ;;
-	riscv64) arch=riscv64 ;;
 	*) die "unsupported architecture: $arch" ;;
 	esac
 

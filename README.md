@@ -68,7 +68,7 @@ Installs to `%LOCALAPPDATA%\Programs\irori` and adds it to your user `PATH`, so 
 
 Grab an archive from the [Releases page](https://github.com/BX-Team/irori/releases/latest) — `irori-<os>-<arch>.tar.gz`, or `.zip` on Windows — unpack it and put `irori` on your `PATH`. Every asset ships a `.sha256` next to it.
 
-Builds are published for Linux (`amd64`, `arm64`, `armv7`, `riscv64`), macOS (`amd64`, `arm64`), Windows (`amd64`, `arm64`) and FreeBSD (`amd64`).
+Builds are published for Linux (`amd64`, `arm64`, `armv7`), macOS (`amd64`, `arm64`), Windows (`amd64`, `arm64`) and FreeBSD (`amd64`).
 
 ### Go
 
