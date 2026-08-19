@@ -1,0 +1,170 @@
+name: PR Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    branches: ["master"]
+
+permissions: {}
+
+concurrency:
+  group: pr-check-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  UPLOAD: ${{ contains(github.event.pull_request.labels.*.name, '📦 upload artifacts') }}
+
+jobs:
+  prepare:
+    name: Resolve the version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Derive the dev version
+        id: resolve
+        env:
+          NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          base="$(sed -n '/pname = "irori";/,/version = / s/.*version = "\([^"]*\)";.*/\1/p' flake.nix | head -n1)"
+          if [ -z "$base" ]; then
+            echo "::error::could not read the version from flake.nix"
+            exit 1
+          fi
+          echo "version=${base%%-*}-dev.pr${NUMBER}.${HEAD_SHA:0:7}" >> "$GITHUB_OUTPUT"
+
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: Check formatting
+        run: |
+          unformatted="$(git ls-files '*.go' | xargs gofmt -l)"
+          if [ -n "$unformatted" ]; then
+            echo "::error::these files need gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Run the tests
+        run: go test ./...
+
+      - name: Lint with golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: latest
+
+  build:
+    name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
+    needs: [prepare]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: linux, goarch: amd64 }
+          - { goos: linux, goarch: arm64 }
+          - { goos: darwin, goarch: arm64 }
+          - { goos: windows, goarch: amd64 }
+          - { goos: freebsd, goarch: amd64 }
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: Build the binary
+        id: build
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        shell: bash
+        run: |
+          mkdir -p dist
+          binary="irori-$GOOS-$GOARCH"
+          if [ "$GOOS" = "windows" ]; then binary="$binary.exe"; fi
+          go build -v -trimpath \
+            -ldflags "-s -w -buildid= -X main.version=$VERSION" \
+            -o "dist/$binary" ./cmd/irori
+          echo "binary=$binary" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the binary
+        if: env.UPLOAD == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: irori-${{ needs.prepare.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/${{ steps.build.outputs.binary }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
+  nix:
+    name: Nix build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Build the flake package
+        run: nix build --print-build-logs .#irori
+
+  gate:
+    name: PR check
+    if: always()
+    needs: [prepare, check, build, nix]
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Fail if any required job did not succeed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          printf 'upstream results: %s\n' "$RESULTS"
+          case "$RESULTS" in
+            *failure*|*cancelled*|*skipped*) exit 1 ;;
+          esac

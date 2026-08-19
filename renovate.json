@@ -1,32 +1,4 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", ":disableDependencyDashboard"],
-  "enabledManagers": ["gomod", "github-actions", "nix"],
-  "labels": ["🔄 dependencies"],
-  "baseBranchPatterns": ["master"],
-  "semanticCommitType": "build",
-  "commitMessagePrefix": "chore(deps): ",
-  "postUpdateOptions": ["gomodTidy"],
-  "packageRules": [
-    {
-      "matchUpdateTypes": ["patch"],
-      "automerge": true
-    },
-    {
-      "matchManagers": ["gomod"],
-      "groupName": "go dependencies"
-    },
-    {
-      "matchManagers": ["github-actions"],
-      "groupName": "github actions"
-    },
-    {
-      "matchManagers": ["nix"],
-      "groupName": "nixpkgs"
-    },
-    {
-      "matchDepTypes": ["golang"],
-      "enabled": false
-    }
-  ]
+  "extends": ["github>BX-Team/.github//renovate/go"]
 }

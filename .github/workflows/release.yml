@@ -1,109 +1,165 @@
-name: Release Build
+name: Publish Release
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (e.g. 1.2.3)"
+        description: Version to release (e.g. 1.2.3)
         required: true
         type: string
-      prerelease:
-        description: "Mark as pre-release"
+      description:
+        description: "Optional summary for the top of the release notes. Use \\n for a line break."
         required: false
-        type: boolean
+        default: ""
+        type: string
+      prerelease:
+        description: Mark the release as a pre-release
         default: false
+        type: boolean
+      draft:
+        description: Leave the release as a draft instead of publishing it
+        default: false
+        type: boolean
 
-permissions:
-  contents: write
+permissions: {}
 
 concurrency:
-  group: release-${{ github.workflow }}-${{ inputs.version }}
+  group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   prepare:
-    name: Prepare Release Metadata
+    name: Resolve the version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      tag: ${{ steps.resolve.outputs.tag }}
+      previous: ${{ steps.resolve.outputs.previous }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate the version and find the previous tag
+        id: resolve
+        env:
+          VERSION: ${{ inputs.version }}
+        shell: bash
+        run: |
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::'$VERSION' is not a semantic version"
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+            echo "::error::tag v$VERSION already exists"
+            exit 1
+          fi
+          {
+            echo "version=$VERSION"
+            echo "tag=v$VERSION"
+            echo "previous=$(git tag --list 'v*' --sort=-v:refname | head -n1)"
+          } >> "$GITHUB_OUTPUT"
+
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: Check formatting
+        run: |
+          unformatted="$(git ls-files '*.go' | xargs gofmt -l)"
+          if [ -n "$unformatted" ]; then
+            echo "::error::these files need gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Run the tests
+        run: go test ./...
+
+      - name: Lint with golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: latest
+
+  tag:
+    name: Tag the release
+    needs: [prepare, check]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     outputs:
-      tag: ${{ steps.meta.outputs.tag }}
-      previous_tag: ${{ steps.prev_tag.outputs.latest_tag }}
-      changelog: ${{ steps.changelog.outputs.changelog }}
+      sha: ${{ steps.push.outputs.sha }}
     steps:
-      - name: Checkout repository
+      - name: Check out the repository
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.ref }}
           fetch-depth: 0
-          fetch-tags: true
+          token: ${{ secrets.RELEASE_TOKEN }}
 
-      - name: Validate version format
-        shell: bash
-        run: |
-          if ! [[ "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
-            echo "Invalid version: ${{ inputs.version }}"
-            echo "Expected semver format, e.g. 1.2.3 or 1.2.3-rc.1"
-            exit 1
-          fi
-
-      - name: Set version in flake.nix
-        shell: bash
-        run: |
-          sed -i '/pname = "irori";/,/version = / s/version = "[^"]*";/version = "${{ inputs.version }}";/' flake.nix
-
-      - name: Commit version bump
-        uses: stefanzweifel/git-auto-commit-action@v7
-        with:
-          commit_message: "chore(release): bump version to ${{ inputs.version }}"
-
-      - name: Compute release tag
-        id: meta
-        shell: bash
-        run: echo "tag=v${{ inputs.version }}" >> "$GITHUB_OUTPUT"
-
-      - name: Find previous release tag
-        id: prev_tag
-        shell: bash
-        run: |
-          latest_tag="$(git tag --list 'v*' --sort=-version:refname | grep -vx "v${{ inputs.version }}" | head -n 1)"
-          if [ -z "$latest_tag" ]; then
-            latest_tag="v${{ inputs.version }}"
-          fi
-          echo "latest_tag=$latest_tag" >> "$GITHUB_OUTPUT"
-
-      - name: Push release tag
-        shell: bash
-        run: |
-          git tag -f "v${{ inputs.version }}" HEAD
-          git push origin "v${{ inputs.version }}" --force
-
-      - name: Build Changelog
-        id: changelog
-        uses: mikepenz/release-changelog-builder-action@v6
-        with:
-          mode: COMMIT
-          fromTag: ${{ steps.prev_tag.outputs.latest_tag }}
-          toTag: v${{ inputs.version }}
-          configuration: ".github/changelog_configuration.json"
+      - name: Set the version in flake.nix
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        shell: bash
+        run: |
+          sed -i '/pname = "irori";/,/version = / s/version = "[^"]*";/version = "'"$VERSION"'";/' flake.nix
+          sed -i 's/main\.version=[^"]*/main.version='"$VERSION"'/' flake.nix
+          grep -q "version = \"$VERSION\";" flake.nix
+          grep -q "main.version=$VERSION" flake.nix
 
-      - name: Create draft release
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: v${{ inputs.version }}
-          name: irori ${{ inputs.version }}
-          body: Draft release. Assets are uploaded by the build matrix.
-          draft: true
-          prerelease: ${{ inputs.prerelease }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Commit the bump and push the tag
+        id: push
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add flake.nix
+          git commit -m "chore(release): bump version to $VERSION"
+          git tag -a "$TAG" -m "$VERSION"
+          git push origin HEAD:"${GITHUB_REF_NAME}"
+          git push origin "$TAG"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-  # Everything is CGO-free, so every target cross-compiles from one Linux runner.
+      - name: Open the draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        shell: bash
+        run: |
+          gh release create "$TAG" \
+            --draft \
+            --title "irori $VERSION" \
+            --notes "Assets are still uploading."
+
   build:
     name: Build (${{ matrix.goos }}/${{ matrix.goarch }}${{ matrix.goarm && format('v{0}', matrix.goarm) || '' }})
-    needs: [prepare]
+    needs: [prepare, tag]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -117,10 +173,11 @@ jobs:
           - { goos: windows, goarch: arm64 }
           - { goos: freebsd, goarch: amd64 }
     steps:
-      - name: Checkout repository
+      - name: Check out the tagged commit
         uses: actions/checkout@v7
         with:
-          ref: v${{ inputs.version }}
+          ref: ${{ needs.tag.outputs.sha }}
+          persist-credentials: false
 
       - name: Set up Go
         uses: actions/setup-go@v7
@@ -128,31 +185,32 @@ jobs:
           go-version-file: go.mod
           check-latest: true
 
-      - name: Build binary
-        shell: bash
+      - name: Build the binary
         env:
           CGO_ENABLED: "0"
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           GOARM: ${{ matrix.goarm }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        shell: bash
         run: |
           mkdir -p dist
           binary="irori"
           if [ "$GOOS" = "windows" ]; then binary="irori.exe"; fi
           go build -v -trimpath \
-            -ldflags "-s -w -buildid= -X main.version=${{ inputs.version }}" \
+            -ldflags "-s -w -buildid= -X main.version=$VERSION" \
             -o "dist/$binary" ./cmd/irori
 
-      - name: Package archive
-        id: pkg
-        shell: bash
+      - name: Package the archive
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+        shell: bash
         run: |
           suffix="$GOOS-$GOARCH"
-          if [ -n "${{ matrix.goarm }}" ]; then suffix="$suffix-v${{ matrix.goarm }}"; fi
-          cp README.md dist/
+          if [ -n "$GOARM" ]; then suffix="$suffix-v$GOARM"; fi
+          cp README.md LICENSE dist/
           cd dist
           if [ "$GOOS" = "windows" ]; then
             asset="irori-$suffix.zip"
@@ -163,27 +221,27 @@ jobs:
           fi
           cd ..
           sha256sum "$asset" | awk '{print $1}' > "$asset.sha256"
-          echo "asset=$asset" >> "$GITHUB_OUTPUT"
 
-      - name: Upload release assets
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: v${{ inputs.version }}
-          files: |
-            ${{ steps.pkg.outputs.asset }}
-            ${{ steps.pkg.outputs.asset }}.sha256
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload the assets to the draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        shell: bash
+        run: gh release upload "$TAG" irori-*.tar.gz irori-*.zip irori-*.sha256 --clobber
 
   cachix:
     name: Push to Cachix
-    needs: [prepare]
-    runs-on: ubuntu-latest
+    needs: [tag]
     if: ${{ ! inputs.prerelease }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - name: Checkout repository
+      - name: Check out the tagged commit
         uses: actions/checkout@v7
         with:
-          ref: v${{ inputs.version }}
+          ref: ${{ needs.tag.outputs.sha }}
+          persist-credentials: false
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
@@ -197,20 +255,112 @@ jobs:
           name: bx-team
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      - name: Build (and push) the flake package
+      - name: Build and push the flake package
         run: nix build --print-build-logs .#irori
 
   publish:
-    name: Publish release
-    needs: [prepare, build]
+    name: Publish the release
+    needs: [prepare, tag, build]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - name: Finalize release with changelog
-        uses: softprops/action-gh-release@v3
+      - name: Check out the tagged commit
+        uses: actions/checkout@v7
         with:
-          tag_name: ${{ needs.prepare.outputs.tag }}
-          name: irori ${{ needs.prepare.outputs.tag }}
-          body: ${{ needs.prepare.outputs.changelog }}
-          draft: false
-          prerelease: ${{ inputs.prerelease }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ needs.tag.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify the release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        shell: bash
+        run: |
+          have="$(gh release view "$TAG" --json assets --jq '.assets[].name')"
+          printf 'attached:\n%s\n\n' "$have"
+          missing=0
+          for asset in \
+            "irori-linux-amd64.tar.gz" \
+            "irori-linux-arm64.tar.gz" \
+            "irori-linux-arm-v7.tar.gz" \
+            "irori-darwin-amd64.tar.gz" \
+            "irori-darwin-arm64.tar.gz" \
+            "irori-windows-amd64.zip" \
+            "irori-windows-arm64.zip" \
+            "irori-freebsd-amd64.tar.gz"; do
+            for name in "$asset" "$asset.sha256"; do
+              if ! printf '%s\n' "$have" | grep -qxF "$name"; then
+                echo "::error::missing release asset '$name'"
+                missing=1
+              fi
+            done
+          done
+          exit "$missing"
+
+      - name: Build the changelog
+        id: changelog
+        uses: mikepenz/release-changelog-builder-action@v6
+        with:
+          configuration: .github/changelog_configuration.json
+          mode: COMMIT
+          fromTag: ${{ needs.prepare.outputs.previous }}
+          toTag: ${{ needs.prepare.outputs.tag }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compose the release body
+        env:
+          DESCRIPTION: ${{ inputs.description }}
+          CHANGELOG: ${{ steps.changelog.outputs.changelog }}
+        shell: bash
+        run: |
+          if [ -n "$(printf '%s' "$DESCRIPTION" | tr -d '[:space:]')" ]; then
+            {
+              echo '## 📑 Changelog'
+              echo
+              # %b so a '\n' typed into the dispatch field becomes a real line
+              # break — GitHub renders that input as a single-line box.
+              printf '%b\n' "$DESCRIPTION"
+              echo
+              printf '%s\n' "$CHANGELOG" | sed 's/^## /### /'
+            } >body.md
+          else
+            printf '%s\n' "$CHANGELOG" >body.md
+          fi
+
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          DRAFT: ${{ inputs.draft }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        shell: bash
+        run: |
+          gh release edit "$TAG" \
+            --title "irori $VERSION" \
+            --notes-file body.md \
+            --draft="$DRAFT" \
+            --prerelease="$PRERELEASE" \
+            --latest="$([ "$PRERELEASE" = 'true' ] && echo false || echo true)"
+
+      - name: Write the result to the run summary
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ needs.prepare.outputs.tag }}
+        shell: bash
+        run: |
+          {
+            echo "## [$TAG]($URL)"
+            echo
+            echo '| Asset |'
+            echo '| --- |'
+            gh release view "$TAG" --json assets --jq '.assets[].name' \
+              | grep -v '[.]sha256$' \
+              | awk '{ printf "| `%s` |\n", $0 }'
+            echo
+            cat body.md
+          } >> "$GITHUB_STEP_SUMMARY"

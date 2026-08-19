@@ -55,7 +55,7 @@ golangci-lint run       # config: .golangci.yaml
 nix build .#irori       # the flake package
 ```
 
-CI runs gofmt, `go vet`, `go test`, golangci-lint and a cross-compile matrix — all of it must pass before a commit. The daemon is the one package with per-OS files (`proc_unix.go` / `proc_windows.go`), so check `GOOS=windows go build ./...` after touching it.
+CI runs gofmt, `go vet`, `go test`, golangci-lint, `nix build .#irori` and a cross-compile matrix — all of it must pass before a commit. The Nix job is the one that catches a `flake.nix` left behind by a change to the build. The daemon is the one package with per-OS files (`proc_unix.go` / `proc_windows.go`), so check `GOOS=windows go build ./...` after touching it.
 
 ## Code Guidelines
 
