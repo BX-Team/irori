@@ -136,7 +136,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add flake.nix
-          git commit -m "chore(release): bump version to $VERSION"
+          git diff --cached --quiet || git commit -m "chore(release): bump version to $VERSION"
           git tag -a "$TAG" -m "$VERSION"
           git push origin HEAD:"${GITHUB_REF_NAME}"
           git push origin "$TAG"
@@ -171,7 +171,6 @@ jobs:
           - { goos: darwin, goarch: arm64 }
           - { goos: windows, goarch: amd64 }
           - { goos: windows, goarch: arm64 }
-          - { goos: freebsd, goarch: amd64 }
     steps:
       - name: Check out the tagged commit
         uses: actions/checkout@v7
@@ -202,6 +201,7 @@ jobs:
             -o "dist/$binary" ./cmd/irori
 
       - name: Package the archive
+        id: package
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
@@ -221,13 +221,15 @@ jobs:
           fi
           cd ..
           sha256sum "$asset" | awk '{print $1}' > "$asset.sha256"
+          echo "asset=$asset" >> "$GITHUB_OUTPUT"
 
       - name: Upload the assets to the draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ needs.prepare.outputs.tag }}
+          ASSET: ${{ steps.package.outputs.asset }}
         shell: bash
-        run: gh release upload "$TAG" irori-*.tar.gz irori-*.zip irori-*.sha256 --clobber
+        run: gh release upload "$TAG" "$ASSET" "$ASSET.sha256" --clobber
 
   cachix:
     name: Push to Cachix
@@ -288,8 +290,7 @@ jobs:
             "irori-darwin-amd64.tar.gz" \
             "irori-darwin-arm64.tar.gz" \
             "irori-windows-amd64.zip" \
-            "irori-windows-arm64.zip" \
-            "irori-freebsd-amd64.tar.gz"; do
+            "irori-windows-arm64.zip"; do
             for name in "$asset" "$asset.sha256"; do
               if ! printf '%s\n' "$have" | grep -qxF "$name"; then
                 echo "::error::missing release asset '$name'"

@@ -54,7 +54,6 @@ target() {
 	case "$os" in
 	Linux) os=linux ;;
 	Darwin) os=darwin ;;
-	FreeBSD) os=freebsd ;;
 	*) die "unsupported operating system: $os" ;;
 	esac
 
