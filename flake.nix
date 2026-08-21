@@ -13,13 +13,13 @@
     packages = forAllSystems (pkgs: rec {
       irori = pkgs.buildGoModule {
         pname = "irori";
-        version = "0.1.0";
+        version = "1.0.0";
         src = ./.;
 
         vendorHash = "sha256-u5xa0xwOquyVxf7yQVdNKiugw25yShQkyikfEFLg7Z4=";
 
         subPackages = ["cmd/irori"];
-        ldflags = ["-s" "-w" "-X" "main.version=0.1.0"];
+        ldflags = ["-s" "-w" "-X" "main.version=1.0.0"];
 
         meta = {
           description = "TUI for managing a Minecraft server";
