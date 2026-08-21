@@ -1,0 +1,87 @@
+name: Vendor Hash
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: ["master"]
+    paths:
+      - "go.mod"
+      - "go.sum"
+      - "flake.nix"
+      - "flake.lock"
+
+permissions: {}
+
+concurrency:
+  group: vendor-hash-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    name: Sync the vendor hash
+    # A fork has neither the secrets nor a branch this job could push to.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the pull request branch
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          # RELEASE_TOKEN, not GITHUB_TOKEN: a push made with the latter does
+          # not start a new workflow run, so the PR would sit on a head commit
+          # that no check ever reports on.
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Compute the vendor hash
+        id: hash
+        shell: bash
+        run: |
+          fake="sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+          old="$(sed -n 's|.*vendorHash = "\([^"]*\)";.*|\1|p' flake.nix | head -n1)"
+          if [ -z "$old" ]; then
+            echo "::error::could not read vendorHash from flake.nix"
+            exit 1
+          fi
+
+          # The fixed-output derivation can never match the fake hash, so nix
+          # fails and prints the real one on its 'got:' line.
+          sed -i 's|vendorHash = "[^"]*";|vendorHash = "'"$fake"'";|' flake.nix
+          log="$(nix build --no-link .#irori 2>&1 || true)"
+          printf '%s\n' "$log"
+          new="$(printf '%s\n' "$log" | sed -n 's|^ *got: *\(sha256-[A-Za-z0-9+/=]*\).*|\1|p' | head -n1)"
+          if [ -z "$new" ]; then
+            echo "::error::nix did not report a vendor hash"
+            exit 1
+          fi
+          sed -i 's|vendorHash = "[^"]*";|vendorHash = "'"$new"'";|' flake.nix
+
+          if [ "$new" = "$old" ]; then
+            echo "the vendor hash is already correct"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "$old -> $new"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify the flake builds
+        if: steps.hash.outputs.changed == 'true'
+        run: nix build --no-link --print-build-logs .#irori
+
+      - name: Commit the new hash
+        if: steps.hash.outputs.changed == 'true'
+        env:
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore: update the Nix vendor hash' flake.nix
+          git push origin HEAD:"$BRANCH"
